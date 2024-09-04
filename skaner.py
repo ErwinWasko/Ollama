@@ -3,7 +3,9 @@ from psycopg2 import OperationalError
 import requests
 import ollama
 
+# Klucze API
 VULNERS_API_KEY = 'Y47IVL3UK8GBBMAB667MN5SF7LOK2ALDDLQ8Q2WV6OSSY4495EP5O2A7SZ7W4PQ7'
+FEEDLY_ACCESS_TOKEN = 'fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf'
 
 # Funkcja łącząca się z bazą danych PostgreSQL
 def connect_to_database():
@@ -112,15 +114,47 @@ def process_mitre_data(mitre_data):
     else:
         return "Failed to retrieve valid data from MITRE."
 
+# Funkcja pobierająca dane z Feedly API
+def fetch_feedly_data(cve):
+    url = 'https://cloud.feedly.com/v3/search/contents'
+    headers = {
+        'Authorization': f'Bearer {FEEDLY_ACCESS_TOKEN}'
+    }
+    params = {
+        'query': cve,
+        'count': 5  # Liczba artykułów do pobrania
+    }
+
+    try:
+        response = requests.get(url, headers=headers, params=params)
+        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
+        feedly_data = response.json()
+        return feedly_data
+    except requests.RequestException as e:
+        print(f"Error fetching data from Feedly: {e}")
+        return None
+
+# Funkcja przetwarzająca dane z Feedly w celu wygenerowania czytelnej odpowiedzi tekstowej
+def process_feedly_data(feedly_data):
+    if feedly_data and 'items' in feedly_data:
+        items = feedly_data['items']
+        if not items:
+            return "No relevant articles found in Feedly."
+        
+        articles = [f"Title: {item.get('title', 'No title available')}\nLink: {item.get('originId', 'No link available')}" for item in items]
+        return "\n\n".join(articles)
+    else:
+        return "Failed to retrieve valid data from Feedly."
+
 # Funkcja analizująca dane przy użyciu Ollama API
-def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data):
+def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly_data):
     try:
         # Przygotowanie klienta Ollama
         client = ollama.Client()
         
         model_name = "llama3"
         
-        # Konstruowanie promptu z uwzględnieniem danych z Vulners i MITRE
+        # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE i Feedly
         prompt = f"""
         Here are the details of a vulnerability:
         CVSS Score: {cvss}
@@ -131,6 +165,9 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data):
         
         Additionally, here is the data retrieved from MITRE CVE for further analysis:
         {mitre_data}
+
+        Additionally, here are the latest articles from Feedly related to this CVE:
+        {feedly_data}
 
         Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability.
         """
@@ -197,8 +234,17 @@ def main():
         # Przetwarzanie danych z MITRE
         mitre_analysis = process_mitre_data(mitre_data)
     
+    # Pobieranie danych z Feedly
+    feedly_data = fetch_feedly_data(cve)
+    if feedly_data is None:
+        print(f"Failed to fetch data from Feedly for CVE: {cve}")
+        feedly_analysis = "No articles found in Feedly."
+    else:
+        # Przetwarzanie danych z Feedly
+        feedly_analysis = process_feedly_data(feedly_data)
+    
     # Analiza danych przy użyciu Ollama API
-    ollama_analysis = analyze_data_with_ollama(cvss, description, vulners_analysis, mitre_analysis)
+    ollama_analysis = analyze_data_with_ollama(cvss, description, vulners_analysis, mitre_analysis, feedly_analysis)
     
     # Wyświetl wyniki
     print(f"Report for CVE: {cve}")
@@ -214,10 +260,10 @@ def main():
     
     print("MITRE Analysis:")
     print(mitre_analysis)  # Wyświetl przetworzoną analizę danych z MITRE
+
+    print("Feedly Analysis:")
+    print(feedly_analysis)  # Wyświetl przetworzoną analizę danych z Feedly
     print("\n")
 
 if __name__ == "__main__":
     main()
-
-
-# fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf - API FEEDLY
