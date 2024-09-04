@@ -1,0 +1,220 @@
+import psycopg2
+from psycopg2 import OperationalError
+import requests
+import ollama
+
+VULNERS_API_KEY = 'Y47IVL3UK8GBBMAB667MN5SF7LOK2ALDDLQ8Q2WV6OSSY4495EP5O2A7SZ7W4PQ7'
+
+# Funkcja łącząca się z bazą danych PostgreSQL
+def connect_to_database():
+    try:
+        connection = psycopg2.connect(
+            host='localhost',
+            user='postgres',  # Użytkownik PostgreSQL
+            password='root',  
+            database='postgres'
+        )
+        
+        if connection:
+            print("Connected to PostgreSQL database")
+            return connection
+    except OperationalError as e:
+        print(f"Error: {e}")
+        return None
+
+# Funkcja pobierająca raporty o podatnościach z bazy danych
+def fetch_security_reports():
+    connection = connect_to_database()
+    if connection is None:
+        return []
+
+    try:
+        cursor = connection.cursor()
+        query = """
+        SELECT * 
+        FROM securityreports 
+        ORDER BY CAST(cvss AS DECIMAL(3,1)) DESC
+        """
+        cursor.execute(query)
+        columns = [desc[0] for desc in cursor.description]
+        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+        if results:
+            print("Sample report data:", results[0])  # Wyświetl pierwszy wynik
+        return results
+
+    except OperationalError as e:
+        print(f"Error: {e}")
+        return []
+
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+# Funkcja pobierająca dane z Vulners API
+def fetch_vulners_data(cve):
+    url = 'https://vulners.com/api/v3/search/lucene/'
+    data = {
+        "query": cve,
+        "apiKey": VULNERS_API_KEY
+    }
+
+    try:
+        response = requests.post(url, json=data)
+        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
+        vulners_data = response.json()
+        return vulners_data
+    except requests.RequestException as e:
+        print(f"Error fetching data from Vulners: {e}")
+        return None
+
+# Funkcja przetwarzająca dane z Vulners w celu wygenerowania czytelnej odpowiedzi tekstowej
+def process_vulners_data(vulners_data):
+    if vulners_data['result'] == 'OK':
+        total_results = vulners_data['data']['total']
+        if total_results == 0:
+            return "No relevant information found in Vulners database for this CVE."
+        else:
+            search_results = vulners_data['data']['search']
+            top_result = search_results[0] if search_results else None
+            
+            if top_result:
+                title = top_result.get('title', 'No title available')
+                description = top_result.get('description', 'No description available')
+                return f"Top result from Vulners:\nTitle: {title}\nDescription: {description}"
+            else:
+                return "No detailed information available in the search results."
+    else:
+        return "Failed to retrieve valid data from Vulners."
+
+# Funkcja pobierająca dane z MITRE CVE API
+def fetch_mitre_data(cve):
+    url = f'https://cveawg.mitre.org/api/cve-id/{cve}'
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
+        mitre_data = response.json()
+        return mitre_data
+    except requests.RequestException as e:
+        print(f"Error fetching data from MITRE: {e}")
+        return None
+
+# Funkcja przetwarzająca dane z MITRE CVE API
+def process_mitre_data(mitre_data):
+    if mitre_data:
+        cve_id = mitre_data.get('cveMetadata', {}).get('cveId', 'N/A')
+        description = mitre_data.get('containers', {}).get('cna', {}).get('descriptions', [{'value': 'No description available'}])[0]['value']
+        references = mitre_data.get('containers', {}).get('cna', {}).get('references', [])
+        
+        ref_text = "\n".join([f"- {ref['url']}" for ref in references]) if references else "No references available."
+        
+        return f"Details from MITRE CVE:\nCVE ID: {cve_id}\nDescription: {description}\nReferences:\n{ref_text}"
+    else:
+        return "Failed to retrieve valid data from MITRE."
+
+# Funkcja analizująca dane przy użyciu Ollama API
+def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data):
+    try:
+        # Przygotowanie klienta Ollama
+        client = ollama.Client()
+        
+        model_name = "llama3"
+        
+        # Konstruowanie promptu z uwzględnieniem danych z Vulners i MITRE
+        prompt = f"""
+        Here are the details of a vulnerability:
+        CVSS Score: {cvss}
+        Description: {description}
+
+        Additionally, here is the data retrieved from Vulners for further analysis:
+        {vulners_data}
+        
+        Additionally, here is the data retrieved from MITRE CVE for further analysis:
+        {mitre_data}
+
+        Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability.
+        """
+        
+        # Debugowanie promptu
+        print("Prompt for Ollama:", prompt)
+        
+        # Analiza danych
+        response = client.generate(model=model_name, prompt=prompt)
+        
+        # Sprawdzamy strukturę odpowiedzi
+        if isinstance(response, dict):
+            # Wydobywamy tekst z klucza 'response'
+            if 'response' in response:
+                text_response = response['response']
+                # Filtrujemy cyfry z odpowiedzi
+                filtered_response = ''.join(char for char in text_response if not char.isdigit())
+                return filtered_response.strip()  # Usunięcie białych znaków z początku i końca
+            else:
+                print("No 'response' key in Ollama response.")
+                return "No valid response from Ollama."
+        else:
+            print("Unexpected response format from Ollama.")
+            return "No valid response from Ollama."
+        
+    except Exception as e:
+        print(f"Error analyzing data with Ollama: {e}")
+        return "No valid response from Ollama."
+
+def main():
+    # Pobieranie raportów o podatnościach
+    reports = fetch_security_reports()
+    
+    if not reports:
+        print("No security reports found.")
+        return
+    
+    # Znalezienie raportu o najwyższym wskaźniku CVSS
+    highest_cvss_report = max(reports, key=lambda r: float(r.get('cvss', 0)))
+    
+    # Pobieranie poziomu CVSS i opisu
+    cvss = highest_cvss_report.get('cvss', 'N/A')
+    description = highest_cvss_report.get('description', 'No description available')
+    
+    # Pobieranie danych z Vulners API
+    cve = highest_cvss_report.get('cve')
+    if cve is None:
+        print("CVE key is missing in highest CVSS report")
+        return
+    
+    vulners_data = fetch_vulners_data(cve)
+    if vulners_data is None:
+        print(f"Failed to fetch data from Vulners for CVE: {cve}")
+        vulners_analysis = "No data available from Vulners."
+    else:
+        # Przetwarzanie danych z Vulners
+        vulners_analysis = process_vulners_data(vulners_data)
+    
+    # Pobieranie danych z MITRE CVE API
+    mitre_data = fetch_mitre_data(cve)
+    if mitre_data is None:
+        mitre_analysis = "CVE not found in MITRE database."
+    else:
+        # Przetwarzanie danych z MITRE
+        mitre_analysis = process_mitre_data(mitre_data)
+    
+    # Analiza danych przy użyciu Ollama API
+    ollama_analysis = analyze_data_with_ollama(cvss, description, vulners_analysis, mitre_analysis)
+    
+    # Wyświetl wyniki
+    print(f"Report for CVE: {cve}")
+    print("Ollama Analysis:")
+    if ollama_analysis:
+        print(ollama_analysis)  # Wyświetl odpowiedź Ollama
+    else:
+        print("No analysis available")
+    print("\n")
+    
+    print("Vulners Analysis:")
+    print(vulners_analysis)  # Wyświetl przetworzoną analizę danych z Vulners
+    
+    print("MITRE Analysis:")
+    print(mitre_analysis)  # Wyświetl przetworzoną analizę danych z MITRE
+    print("\n")
+
+if __name__ == "__main__":
+    main()
