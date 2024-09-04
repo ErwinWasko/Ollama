@@ -2,6 +2,7 @@ import psycopg2
 from psycopg2 import OperationalError
 import requests
 import ollama
+from bs4 import BeautifulSoup
 
 # Klucze API
 VULNERS_API_KEY = 'Y47IVL3UK8GBBMAB667MN5SF7LOK2ALDDLQ8Q2WV6OSSY4495EP5O2A7SZ7W4PQ7'
@@ -146,15 +147,61 @@ def process_feedly_data(feedly_data):
     else:
         return "Failed to retrieve valid data from Feedly."
 
+        # Funkcja pobierająca dane z Exploit-DB
+def fetch_exploit_db_data(cve):
+    url = f"https://www.exploit-db.com/search?q={cve}"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
+        
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Debugowanie: Zobacz pierwszy fragment HTML
+        print("HTML snippet from Exploit-DB:", response.text[:1000])
+        
+        table = soup.find('table', {'id': 'exploits-table'})
+        
+        # Sprawdzenie, czy tabela istnieje
+        if not table:
+            print("No exploits table found in Exploit-DB HTML.")
+            return "No exploits found for this CVE in Exploit-DB."
+        
+        # Znalezienie wszystkich wierszy tabeli, bez względu na istnienie tbody
+        rows = table.find_all('tr')
+        if not rows:
+            return "No exploits found for this CVE in Exploit-DB."
+
+        exploits = []
+        for row in rows[1:6]:  # Pomijamy pierwszy wiersz, który zazwyczaj zawiera nagłówki
+            columns = row.find_all('td')
+            if len(columns) > 1:
+                title = columns[1].get_text(strip=True)
+                link = f"https://www.exploit-db.com{columns[1].find('a')['href']}"
+                date = columns[2].get_text(strip=True)
+                exploits.append(f"Title: {title}\nDate: {date}\nLink: {link}")
+        
+        if not exploits:
+            return "No exploits found for this CVE in Exploit-DB."
+        
+        return "\n\n".join(exploits)
+    
+    except requests.RequestException as e:
+        print(f"Error fetching data from Exploit-DB: {e}")
+        return "Failed to retrieve data from Exploit-DB."
+
 # Funkcja analizująca dane przy użyciu Ollama API
-def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly_data):
+def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly_data, exploit_db_data):
     try:
         # Przygotowanie klienta Ollama
         client = ollama.Client()
         
         model_name = "llama3"
         
-        # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE i Feedly
+        # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE, Feedly i Exploit-DB
         prompt = f"""
         Here are the details of a vulnerability:
         CVSS Score: {cvss}
@@ -168,6 +215,9 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
 
         Additionally, here are the latest articles from Feedly related to this CVE:
         {feedly_data}
+
+        Additionally, here are the latest exploits found in Exploit-DB related to this CVE:
+        {exploit_db_data}
 
         Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability.
         """
@@ -243,8 +293,14 @@ def main():
         # Przetwarzanie danych z Feedly
         feedly_analysis = process_feedly_data(feedly_data)
     
+    # Pobieranie danych z Exploit-DB
+    exploit_db_data = fetch_exploit_db_data(cve)
+    if exploit_db_data is None:
+        print(f"Failed to fetch data from Exploit-DB for CVE: {cve}")
+        exploit_db_data = "No exploits found in Exploit-DB."
+    
     # Analiza danych przy użyciu Ollama API
-    ollama_analysis = analyze_data_with_ollama(cvss, description, vulners_analysis, mitre_analysis, feedly_analysis)
+    ollama_analysis = analyze_data_with_ollama(cvss, description, vulners_analysis, mitre_analysis, feedly_analysis, exploit_db_data)
     
     # Wyświetl wyniki
     print(f"Report for CVE: {cve}")
@@ -263,6 +319,9 @@ def main():
 
     print("Feedly Analysis:")
     print(feedly_analysis)  # Wyświetl przetworzoną analizę danych z Feedly
+    
+    print("Exploit-DB Analysis:")
+    print(exploit_db_data)  # Wyświetl przetworzoną analizę danych z Exploit-DB
     print("\n")
 
 if __name__ == "__main__":
