@@ -1,9 +1,8 @@
 import mysql.connector
 from mysql.connector import Error
 import requests
-import json
+from bs4 import BeautifulSoup
 import ollama
-import torch
 
 # Klucze API
 VULNERS_API_KEY = 'YOUR_VULNERS_API_KEY'
