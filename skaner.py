@@ -2,11 +2,13 @@ import mysql.connector
 from mysql.connector import Error
 import requests
 from bs4 import BeautifulSoup
+import json
 import ollama
+import torch
 
 # Klucze API
-VULNERS_API_KEY = 'YOUR_VULNERS_API_KEY'
-FEEDLY_ACCESS_TOKEN = 'YOUR_FEEDLY_ACCESS_TOKEN'
+VULNERS_API_KEY = 'Y47IVL3UK8GBBMAB667MN5SF7LOK2ALDDLQ8Q2WV6OSSY4495EP5O2A7SZ7W4PQ7'
+FEEDLY_ACCESS_TOKEN = 'fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf'
 
 # Funkcja łącząca się z bazą danych
 def connect_to_database():
