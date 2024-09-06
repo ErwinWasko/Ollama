@@ -154,9 +154,7 @@ def fetch_exploit_db_data(cve):
         response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
         
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Debugowanie: Zobacz pierwszy fragment HTML
-        print("HTML snippet from Exploit-DB:", response.text[:1000])
+
         
         table = soup.find('table', {'id': 'exploits-table'})
         
@@ -191,11 +189,17 @@ def fetch_exploit_db_data(cve):
 # Funkcja analizująca dane przy użyciu Ollama API
 def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly_data, exploit_db_data):
     try:
+        # Sprawdzenie dostępności GPU
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        if device.type == 'cuda':
+            print("GPU has been successfully loaded and is available.")
+        else:
+            print("GPU is not available. Running on CPU.")
+
         # Przygotowanie klienta Ollama
         client = ollama.Client()
-        
         model_name = "llama3"
-        
+
         # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE, Feedly i Exploit-DB
         prompt = f"""
         Here are the details of a vulnerability:
@@ -221,7 +225,7 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
         print("Prompt for Ollama:", prompt)
         
         # Analiza danych
-        response = client.generate(model=model_name, prompt=prompt)
+        response = client.generate(model=model_name, prompt=prompt)  # Brak 'device', używamy domyślnych ustawień
         
         # Sprawdzamy strukturę odpowiedzi
         if isinstance(response, dict):
@@ -241,7 +245,7 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
     except Exception as e:
         print(f"Error analyzing data with Ollama: {e}")
         return "No valid response from Ollama."
-
+    
 def main():
     # Pobieranie raportów o podatnościach
     reports = fetch_security_reports()
