@@ -225,7 +225,7 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
         print("Prompt for Ollama:", prompt)
         
         # Analiza danych
-        response = client.generate(model=model_name, prompt=prompt)  # Brak 'device', używamy domyślnych ustawień
+        response = client.generate(model=model_name, prompt=prompt)
         
         # Sprawdzamy strukturę odpowiedzi
         if isinstance(response, dict):
