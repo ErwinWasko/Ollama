@@ -48,38 +48,51 @@ def fetch_security_reports():
             cursor.close()
             connection.close()
 
-# Funkcja pobierająca dane z Vulners API
-# Funkcja pobierająca dane z Vulners API
+def initialize_vulners_api(api_key):
+    try:
+        return VulnersApi(api_key=api_key)
+    except Exception as e:
+        print(f"Error initializing Vulners API: {e}")
+        return None
+
 def fetch_vulners_data(cve):
-    api_key = "RT8X38G9MG5OXXQLLCWOT523N5M1WZMHZMMSY0NI63162IG4L00NXJPWD3NF61R8"  # Twój klucz API Vulners
+    api_key = "PH8H76HM2HV9WSAEB62S7FODG99C0LGC2428N54GWQ64B4HUDTRQU2PAMEBP9DV9"  # Wstaw nowy klucz API Vulners tutaj
+    vulners_api = initialize_vulners_api(api_key)
+    
+    if not vulners_api:
+        return None
     
     try:
-        # Inicjalizacja klienta VulnersApi z kluczem API
-        vulners_api = VulnersApi(api_key)
+        # Pobieranie informacji o CVE
+        result = vulners_api.get_bulletin(cve)
         
-        # Pobranie informacji o CVE
-        cve_data = vulners_api.get_bulletin(cve)
+        # Debugowanie odpowiedzi
+        print("Vulners API response:", result)
         
-        if cve_data and 'result' in cve_data and cve_data['result'] == 'OK' and 'data' in cve_data and cve_data['data']:
-            return cve_data['data']
+        if result and 'data' in result:
+            return result['data']
         else:
             print(f"No data found for CVE: {cve}")
             return None
-    except Exception as e:
+    except requests.RequestException as e:
         print(f"Failed to retrieve data from Vulners: {e}")
         return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
-# Funkcja przetwarzająca dane z Vulners
 def process_vulners_data(vulners_data):
     if not vulners_data:
         return "No data available"
-    
+
     # Przykład przetwarzania danych
     description = vulners_data.get('description', 'No description available')
     link = vulners_data.get('link', 'No link available')
+
+    # Przetworzone dane do wyników analizy
+    analysis_results = f"Description: {description}\nLink: {link}"
     
-    # Formatowanie przetworzonych danych
-    return f"Description: {description}\nLink: {link}"
+    return analysis_results
 
 
 # Funkcja pobierająca dane z MITRE CVE API
@@ -311,8 +324,11 @@ def main():
     print(vulners_analysis)  # Wyświetl przetworzoną analizę danych z Vulners
 
     data = fetch_vulners_data(cve)
-    processed_data = process_vulners_data(data)
-    print(processed_data)
+    if data:
+        processed_data = process_vulners_data(data)
+        print(processed_data)
+    else:
+        print("Failed to fetch or process data.")
     
     print("MITRE Analysis:")
     print(mitre_analysis)  # Wyświetl przetworzoną analizę danych z MITRE
