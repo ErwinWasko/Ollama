@@ -2,12 +2,11 @@ import mysql.connector
 from mysql.connector import Error
 import requests
 from bs4 import BeautifulSoup
-import json
 import ollama
 import torch
+from vulners import VulnersApi
 
 # Klucze API
-VULNERS_API_KEY = 'Y47IVL3UK8GBBMAB667MN5SF7LOK2ALDDLQ8Q2WV6OSSY4495EP5O2A7SZ7W4PQ7'
 FEEDLY_ACCESS_TOKEN = 'fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf'
 
 # Funkcja łącząca się z bazą danych
@@ -28,7 +27,7 @@ def connect_to_database():
 def fetch_security_reports():
     connection = connect_to_database()
     if connection is None:
-        return []
+        return [], 0  # Zwraca pustą listę i 0, jeśli połączenie nie działa
 
     try:
         cursor = connection.cursor()
@@ -43,47 +42,45 @@ def fetch_security_reports():
         return results
     except Error as e:
         print(f"Error: {e}")
-        return []
+        return [], 0
     finally:
         if connection:
             cursor.close()
             connection.close()
 
 # Funkcja pobierająca dane z Vulners API
+# Funkcja pobierająca dane z Vulners API
 def fetch_vulners_data(cve):
-    url = 'https://vulners.com/api/v3/search/lucene/'
-    data = {
-        "query": cve,
-        "apiKey": VULNERS_API_KEY
-    }
-
+    api_key = "RT8X38G9MG5OXXQLLCWOT523N5M1WZMHZMMSY0NI63162IG4L00NXJPWD3NF61R8"  # Twój klucz API Vulners
+    
     try:
-        response = requests.post(url, json=data)
-        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
-        vulners_data = response.json()
-        return vulners_data
-    except requests.RequestException as e:
-        print(f"Error fetching data from Vulners: {e}")
+        # Inicjalizacja klienta VulnersApi z kluczem API
+        vulners_api = VulnersApi(api_key)
+        
+        # Pobranie informacji o CVE
+        cve_data = vulners_api.get_bulletin(cve)
+        
+        if cve_data and 'result' in cve_data and cve_data['result'] == 'OK' and 'data' in cve_data and cve_data['data']:
+            return cve_data['data']
+        else:
+            print(f"No data found for CVE: {cve}")
+            return None
+    except Exception as e:
+        print(f"Failed to retrieve data from Vulners: {e}")
         return None
 
-# Funkcja przetwarzająca dane z Vulners w celu wygenerowania czytelnej odpowiedzi tekstowej
+# Funkcja przetwarzająca dane z Vulners
 def process_vulners_data(vulners_data):
-    if vulners_data['result'] == 'OK':
-        total_results = vulners_data['data']['total']
-        if total_results == 0:
-            return "No relevant information found in Vulners database for this CVE."
-        else:
-            search_results = vulners_data['data']['search']
-            top_result = search_results[0] if search_results else None
-            
-            if top_result:
-                title = top_result.get('title', 'No title available')
-                description = top_result.get('description', 'No description available')
-                return f"Top result from Vulners:\nTitle: {title}\nDescription: {description}"
-            else:
-                return "No detailed information available in the search results."
-    else:
-        return "Failed to retrieve valid data from Vulners."
+    if not vulners_data:
+        return "No data available"
+    
+    # Przykład przetwarzania danych
+    description = vulners_data.get('description', 'No description available')
+    link = vulners_data.get('link', 'No link available')
+    
+    # Formatowanie przetworzonych danych
+    return f"Description: {description}\nLink: {link}"
+
 
 # Funkcja pobierająca dane z MITRE CVE API
 def fetch_mitre_data(cve):
@@ -187,7 +184,7 @@ def fetch_exploit_db_data(cve):
         return "Failed to retrieve data from Exploit-DB."
 
 # Funkcja analizująca dane przy użyciu Ollama API
-def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly_data, exploit_db_data):
+def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data, feedly_data, exploit_db_data):
     try:
         # Sprawdzenie dostępności GPU
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -203,6 +200,7 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
         # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE, Feedly i Exploit-DB
         prompt = f"""
         Here are the details of a vulnerability:
+        CVE: {cve}
         CVSS Score: {cvss}
         Description: {description}
 
@@ -229,12 +227,10 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
         
         # Sprawdzamy strukturę odpowiedzi
         if isinstance(response, dict):
-            # Wydobywamy tekst z klucza 'response'
             if 'response' in response:
                 text_response = response['response']
-                # Filtrujemy cyfry z odpowiedzi
                 filtered_response = ''.join(char for char in text_response if not char.isdigit())
-                return filtered_response.strip()  # Usunięcie białych znaków z początku i końca
+                return filtered_response.strip()
             else:
                 print("No 'response' key in Ollama response.")
                 return "No valid response from Ollama."
@@ -245,12 +241,13 @@ def analyze_data_with_ollama(cvss, description, vulners_data, mitre_data, feedly
     except Exception as e:
         print(f"Error analyzing data with Ollama: {e}")
         return "No valid response from Ollama."
+        
     
 def main():
     # Pobieranie raportów o podatnościach
     reports = fetch_security_reports()
     
-    if not reports:
+    if not isinstance(reports, list) or not reports:
         print("No security reports found.")
         return
     
@@ -299,7 +296,7 @@ def main():
         exploit_db_data = "No exploits found in Exploit-DB."
     
     # Analiza danych przy użyciu Ollama API
-    ollama_analysis = analyze_data_with_ollama(cvss, description, vulners_analysis, mitre_analysis, feedly_analysis, exploit_db_data)
+    ollama_analysis = analyze_data_with_ollama(cve, cvss, description, vulners_analysis, mitre_analysis, feedly_analysis, exploit_db_data)
     
     # Wyświetl wyniki
     print(f"Report for CVE: {cve}")
@@ -312,6 +309,10 @@ def main():
     
     print("Vulners Analysis:")
     print(vulners_analysis)  # Wyświetl przetworzoną analizę danych z Vulners
+
+    data = fetch_vulners_data(cve)
+    processed_data = process_vulners_data(data)
+    print(processed_data)
     
     print("MITRE Analysis:")
     print(mitre_analysis)  # Wyświetl przetworzoną analizę danych z MITRE
