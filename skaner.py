@@ -1,27 +1,25 @@
-import psycopg2
-from psycopg2 import OperationalError
+import mysql.connector
+from mysql.connector import Error
 import requests
+import json
 import ollama
-from bs4 import BeautifulSoup
+import torch
 
 # Klucze API
-VULNERS_API_KEY = 'Y47IVL3UK8GBBMAB667MN5SF7LOK2ALDDLQ8Q2WV6OSSY4495EP5O2A7SZ7W4PQ7'
-FEEDLY_ACCESS_TOKEN = 'fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf'
+VULNERS_API_KEY = 'YOUR_VULNERS_API_KEY'
+FEEDLY_ACCESS_TOKEN = 'YOUR_FEEDLY_ACCESS_TOKEN'
 
-# Funkcja łącząca się z bazą danych PostgreSQL
+# Funkcja łącząca się z bazą danych
 def connect_to_database():
     try:
-        connection = psycopg2.connect(
+        connection = mysql.connector.connect(
             host='localhost',
-            user='postgres',  # Użytkownik PostgreSQL
-            password='root',  
-            database='postgres'
+            database='test',
+            user='root',
+            password=''
         )
-        
-        if connection:
-            print("Connected to PostgreSQL database")
-            return connection
-    except OperationalError as e:
+        return connection
+    except Error as e:
         print(f"Error: {e}")
         return None
 
@@ -41,14 +39,10 @@ def fetch_security_reports():
         cursor.execute(query)
         columns = [desc[0] for desc in cursor.description]
         results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        if results:
-            print("Sample report data:", results[0])  # Wyświetl pierwszy wynik
         return results
-
-    except OperationalError as e:
+    except Error as e:
         print(f"Error: {e}")
         return []
-
     finally:
         if connection:
             cursor.close()
