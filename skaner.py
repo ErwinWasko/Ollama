@@ -6,9 +6,6 @@ import ollama
 import torch
 from vulners import VulnersApi
 
-# Klucze API
-FEEDLY_ACCESS_TOKEN = 'fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf'
-
 # Funkcja łącząca się z bazą danych
 def connect_to_database():
     try:
@@ -69,10 +66,9 @@ def fetch_vulners_data(cve):
         # Debugowanie odpowiedzi
         print("Vulners API response:", result)
         
-        if result and 'data' in result:
-            return result['data']
+        if result and 'id' in result:
+            return result  # Zwracamy cały wynik, ponieważ zawiera potrzebne informacje
         else:
-            print(f"No data found for CVE: {cve}")
             return None
     except requests.RequestException as e:
         print(f"Failed to retrieve data from Vulners: {e}")
@@ -87,7 +83,7 @@ def process_vulners_data(vulners_data):
 
     # Przykład przetwarzania danych
     description = vulners_data.get('description', 'No description available')
-    link = vulners_data.get('link', 'No link available')
+    link = vulners_data.get('href', 'No link available')
 
     # Przetworzone dane do wyników analizy
     analysis_results = f"Description: {description}\nLink: {link}"
@@ -102,29 +98,43 @@ def fetch_mitre_data(cve):
         response = requests.get(url)
         response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
         mitre_data = response.json()
-        return mitre_data
+        
+        # Debugowanie odpowiedzi
+        print("MITRE API response:", mitre_data)
+        
+        if mitre_data and 'cveMetadata' in mitre_data:
+            return mitre_data
+        else:
+            return None
     except requests.RequestException as e:
         print(f"Error fetching data from MITRE: {e}")
         return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
-# Funkcja przetwarzająca dane z MITRE CVE API
 def process_mitre_data(mitre_data):
-    if mitre_data:
-        cve_id = mitre_data.get('cveMetadata', {}).get('cveId', 'N/A')
-        description = mitre_data.get('containers', {}).get('cna', {}).get('descriptions', [{'value': 'No description available'}])[0]['value']
-        references = mitre_data.get('containers', {}).get('cna', {}).get('references', [])
-        
-        ref_text = "\n".join([f"- {ref['url']}" for ref in references]) if references else "No references available."
-        
-        return f"Details from MITRE CVE:\nCVE ID: {cve_id}\nDescription: {description}\nReferences:\n{ref_text}"
-    else:
-        return "Failed to retrieve valid data from MITRE."
+    if not mitre_data:
+        return "No data available"
+
+    # Przetwarzanie danych z MITRE
+    cve_id = mitre_data.get('cveMetadata', {}).get('cveId', 'N/A')
+    description = mitre_data.get('containers', {}).get('cna', {}).get('descriptions', [{'value': 'No description available'}])[0]['value']
+    references = mitre_data.get('containers', {}).get('cna', {}).get('references', [])
+    
+    ref_text = "\n".join([f"- {ref['url']}" for ref in references]) if references else "No references available."
+    
+    # Przetworzone dane do wyników analizy
+    analysis_results = f"Details from MITRE CVE:\nCVE ID: {cve_id}\nDescription: {description}\nReferences:\n{ref_text}"
+    
+    return analysis_results
 
 # Funkcja pobierająca dane z Feedly API
 def fetch_feedly_data(cve):
-    url = 'https://cloud.feedly.com/v3/search/contents'
+    access_token = 'fe_SkA8e095YN1G03KLhR8IoaOqV4T5xbk8ZsguiLwf'
+    url = f'https://api.feedly.com/v3/search/feeds?q={cve}'
     headers = {
-        'Authorization': f'Bearer {FEEDLY_ACCESS_TOKEN}'
+        'Authorization': f'Bearer {access_token}'
     }
     params = {
         'query': cve,
@@ -135,22 +145,27 @@ def fetch_feedly_data(cve):
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
         feedly_data = response.json()
-        return feedly_data
+
+        # Debugowanie odpowiedzi
+        print("Feedly API response:", feedly_data)
+
+        if feedly_data and 'items' in feedly_data:
+            return feedly_data['items']
+        else:
+            return None
     except requests.RequestException as e:
         print(f"Error fetching data from Feedly: {e}")
         return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
 
-# Funkcja przetwarzająca dane z Feedly w celu wygenerowania czytelnej odpowiedzi tekstowej
 def process_feedly_data(feedly_data):
-    if feedly_data and 'items' in feedly_data:
-        items = feedly_data['items']
-        if not items:
-            return "No relevant articles found in Feedly."
-        
-        articles = [f"Title: {item.get('title', 'No title available')}\nLink: {item.get('originId', 'No link available')}" for item in items]
-        return "\n\n".join(articles)
-    else:
-        return "Failed to retrieve valid data from Feedly."
+    if not feedly_data:
+        return "No relevant articles found in Feedly."
+
+    articles = [f"Title: {item.get('title', 'No title available')}\nLink: {item.get('originId', 'No link available')}" for item in feedly_data]
+    return "\n\n".join(articles)
 
         # Funkcja pobierająca dane z Exploit-DB
 def fetch_exploit_db_data(cve):
@@ -318,26 +333,6 @@ def main():
         print(ollama_analysis)  # Wyświetl odpowiedź Ollama
     else:
         print("No analysis available")
-    print("\n")
-    
-    print("Vulners Analysis:")
-    print(vulners_analysis)  # Wyświetl przetworzoną analizę danych z Vulners
-
-    data = fetch_vulners_data(cve)
-    if data:
-        processed_data = process_vulners_data(data)
-        print(processed_data)
-    else:
-        print("Failed to fetch or process data.")
-    
-    print("MITRE Analysis:")
-    print(mitre_analysis)  # Wyświetl przetworzoną analizę danych z MITRE
-
-    print("Feedly Analysis:")
-    print(feedly_analysis)  # Wyświetl przetworzoną analizę danych z Feedly
-    
-    print("Exploit-DB Analysis:")
-    print(exploit_db_data)  # Wyświetl przetworzoną analizę danych z Exploit-DB
     print("\n")
 
 if __name__ == "__main__":
