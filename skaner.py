@@ -30,8 +30,8 @@ def fetch_security_reports():
         cursor = connection.cursor()
         query = """
         SELECT * 
-        FROM securityreports 
-        ORDER BY CAST(cvss AS DECIMAL(3,1)) DESC
+        FROM vulnerabilities 
+        ORDER BY CAST(vulnerability_score AS DECIMAL(3,1)) DESC
         """
         cursor.execute(query)
         columns = [desc[0] for desc in cursor.description]
@@ -62,9 +62,6 @@ def fetch_vulners_data(cve):
     try:
         # Pobieranie informacji o CVE
         result = vulners_api.get_bulletin(cve)
-        
-        # Debugowanie odpowiedzi
-        print("Vulners API response:", result)
         
         if result and 'id' in result:
             return result  # Zwracamy cały wynik, ponieważ zawiera potrzebne informacje
@@ -100,9 +97,6 @@ def fetch_mitre_data(cve):
         response = requests.get(url)
         response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
         mitre_data = response.json()
-        
-        # Debugowanie odpowiedzi
-        print("MITRE API response:", mitre_data)
         
         if mitre_data and 'cveMetadata' in mitre_data:
             return mitre_data
@@ -145,8 +139,7 @@ def fetch_exploit_db_data(cve):
         
         table = soup.find('table', {'id': 'exploits-table'})
         
-        # Debugowanie odpowiedzi HTML
-        print("Exploit-DB HTML response:", soup.prettify())
+        
         
         # Sprawdzenie, czy tabela istnieje
         if not table:
@@ -263,14 +256,14 @@ def main():
         return
     
     # Znalezienie raportu o najwyższym wskaźniku CVSS
-    highest_cvss_report = max(reports, key=lambda r: float(r.get('cvss', 0)))
+    highest_cvss_report = max(reports, key=lambda r: float(r.get('vulnerability_score', 0)))
     
     # Pobieranie poziomu CVSS i opisu
-    cvss = highest_cvss_report.get('cvss', 'N/A')
+    cvss = highest_cvss_report.get('vulnerability_score', 'N/A')
     description = highest_cvss_report.get('description', 'No description available')
     
     # Pobieranie danych z Vulners API
-    cve = highest_cvss_report.get('cve')
+    cve = highest_cvss_report.get('vulnerability')
     if cve is None:
         print("CVE key is missing in highest CVSS report")
         return
