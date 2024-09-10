@@ -89,6 +89,29 @@ def process_vulners_data(vulners_data):
     
     return analysis_results
 
+def search_vulnerabilities_on_pages(vulnerabilities, urls):
+    matched_vulnerabilities = {}
+
+    for url in urls:
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            page_content = response.text
+            soup = BeautifulSoup(page_content, 'html.parser')
+            page_text = soup.get_text()
+
+            # Szukamy każdej podatności na stronie
+            for vulnerability in vulnerabilities:
+                if vulnerability in page_text:
+                    if vulnerability not in matched_vulnerabilities:
+                        matched_vulnerabilities[vulnerability] = []
+                    matched_vulnerabilities[vulnerability].append(url)
+
+        except requests.RequestException as e:
+            print(f"Failed to retrieve the page {url}: {e}")
+    
+    return matched_vulnerabilities
+
 
 # Funkcja pobierająca dane z MITRE CVE API
 def fetch_mitre_data(cve):
@@ -109,7 +132,7 @@ def fetch_mitre_data(cve):
         print(f"An error occurred: {e}")
         return None
 
-def process_mitre_data(mitre_data):
+def process_mitre_data(mitre_data, vulnerabilities):
     if not mitre_data:
         return "No data available"
 
@@ -117,7 +140,14 @@ def process_mitre_data(mitre_data):
     description = mitre_data.get('containers', {}).get('cna', {}).get('descriptions', [{'value': 'No description available'}])[0]['value']
     references = mitre_data.get('containers', {}).get('cna', {}).get('references', [])
     
-    ref_text = "\n".join([f"- {ref['url']}" for ref in references]) if references else "No references available."
+    # Przeszukiwanie stron pod kątem podatności
+    urls = [ref['url'] for ref in references]
+    matched_vulnerabilities = search_vulnerabilities_on_pages(vulnerabilities, urls)
+    
+    if not matched_vulnerabilities:
+        ref_text = "No vulnerabilities matched on the referenced pages."
+    else:
+        ref_text = "\n".join([f"- {vuln} found on {', '.join(urls)}" for vuln, urls in matched_vulnerabilities.items()])
     
     # Przetworzone dane do wyników analizy
     analysis_results = f"\nDescription: {description}\nReferences:\n{ref_text}"
@@ -194,6 +224,9 @@ def main():
     cvss = highest_cvss_report.get('vulnerability_score', 'N/A')
     description = highest_cvss_report.get('description', 'No description available')
     
+    # Pobieranie wszystkich CVE z bazy danych
+    vulnerabilities = [report.get('vulnerability') for report in reports]
+    
     # Pobieranie danych z Vulners API
     cve = highest_cvss_report.get('vulnerability')
     if cve is None:
@@ -213,8 +246,8 @@ def main():
     if mitre_data is None:
         mitre_analysis = "CVE not found in MITRE database."
     else:
-        # Przetwarzanie danych z MITRE
-        mitre_analysis = process_mitre_data(mitre_data)
+        # Przetwarzanie danych z MITRE z przeszukiwaniem stron
+        mitre_analysis = process_mitre_data(mitre_data, vulnerabilities)
     
     # Analiza danych przy użyciu Ollama API
     ollama_analysis = analyze_data_with_ollama(cve, cvss, description, vulners_analysis, mitre_analysis)
