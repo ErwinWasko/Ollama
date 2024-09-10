@@ -1,10 +1,8 @@
 import mysql.connector
 from mysql.connector import Error
 import requests
-from bs4 import BeautifulSoup
 import ollama
 import torch
-from vulners import VulnersApi
 
 # Funkcja łącząca się z bazą danych
 def connect_to_database():
@@ -45,80 +43,11 @@ def fetch_security_reports():
             cursor.close()
             connection.close()
 
-def initialize_vulners_api(api_key):
-    try:
-        return VulnersApi(api_key=api_key)
-    except Exception as e:
-        print(f"Error initializing Vulners API: {e}")
-        return None
-
-def fetch_vulners_data(cve):
-    api_key = ""  
-    vulners_api = initialize_vulners_api(api_key)
-    
-    if not vulners_api:
-        return None
-    
-    try:
-        # Pobieranie informacji o CVE
-        result = vulners_api.get_bulletin(cve)
-        
-        if result and 'id' in result:
-            return result  # Zwracamy cały wynik, ponieważ zawiera potrzebne informacje
-        else:
-            return None
-    except requests.RequestException as e:
-        print(f"Failed to retrieve data from Vulners: {e}")
-        return None
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
-
-def process_vulners_data(vulners_data):
-    if not vulners_data:
-        return "No data available"
-
-    # Przykład przetwarzania danych
-    description = vulners_data.get('description', 'No description available')
-    references = vulners_data.get('containers', {}).get('cna', {}).get('references', [])
-
-    ref_text = "\n".join([f"- {ref['url']}" for ref in references]) if references else "No references available."
-
-    # Przetworzone dane do wyników analizy
-    analysis_results = f"Description: {description}\nReferences: {ref_text}"
-    
-    return analysis_results
-
-def search_vulnerabilities_on_pages(vulnerabilities, urls):
-    matched_vulnerabilities = {}
-
-    for url in urls:
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            page_content = response.text
-            soup = BeautifulSoup(page_content, 'html.parser')
-            page_text = soup.get_text()
-
-            # Szukamy każdej podatności na stronie
-            for vulnerability in vulnerabilities:
-                if vulnerability in page_text:
-                    if vulnerability not in matched_vulnerabilities:
-                        matched_vulnerabilities[vulnerability] = []
-                    matched_vulnerabilities[vulnerability].append(url)
-
-        except requests.RequestException as e:
-            print(f"Failed to retrieve the page {url}: {e}")
-    
-    return matched_vulnerabilities
-
-
-# Funkcja pobierająca dane z MITRE CVE API
 def fetch_mitre_data(cve):
     url = f'https://cveawg.mitre.org/api/cve/{cve}'
     try:
         response = requests.get(url)
-        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
+        response.raise_for_status()
         mitre_data = response.json()
         
         if mitre_data and 'cveMetadata' in mitre_data:
@@ -132,57 +61,39 @@ def fetch_mitre_data(cve):
         print(f"An error occurred: {e}")
         return None
 
-def process_mitre_data(mitre_data, vulnerabilities):
+def process_mitre_data(mitre_data):
     if not mitre_data:
-        return "No data available"
+        return "No data available", []
 
-    # Przetwarzanie danych z MITRE
     description = mitre_data.get('containers', {}).get('cna', {}).get('descriptions', [{'value': 'No description available'}])[0]['value']
     references = mitre_data.get('containers', {}).get('cna', {}).get('references', [])
     
-    # Przeszukiwanie stron pod kątem podatności
-    urls = [ref['url'] for ref in references]
-    matched_vulnerabilities = search_vulnerabilities_on_pages(vulnerabilities, urls)
+    ref_urls = [ref['url'] for ref in references]
+    ref_text = "\n".join([f"- {url}" for url in ref_urls]) if ref_urls else "No references available."
     
-    if not matched_vulnerabilities:
-        ref_text = "No vulnerabilities matched on the referenced pages."
-    else:
-        ref_text = "\n".join([f"- {vuln} found on {', '.join(urls)}" for vuln, urls in matched_vulnerabilities.items()])
-    
-    # Przetworzone dane do wyników analizy
-    analysis_results = f"\nDescription: {description}\nReferences:\n{ref_text}"
-    
-    return analysis_results
+    return description, ref_urls
 
-
-# Funkcja analizująca dane przy użyciu Ollama API
-def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data):
+def analyze_data_with_ollama(cve, cvss, description, ref_urls):
     try:
         # Sprawdzenie dostępności GPU
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if device.type == 'cuda':
-            print("GPU has been successfully loaded and is available.")
-        else:
-            print("GPU is not available. Running on CPU.")
+        torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
         # Przygotowanie klienta Ollama
         client = ollama.Client()
         model_name = "llama3"
 
-        # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE
+        # Konstruowanie promptu z uwzględnieniem danych z MITRE i referencji
+        ref_text = "\n".join([f"- {url}" for url in ref_urls])
         prompt = f"""
         Here are the details of a vulnerability:
         CVE: {cve}
         CVSS Score: {cvss}
         Description: {description}
-
-        Additionally, here is the data retrieved from Vulners for further analysis:
-        {vulners_data}
         
-        Additionally, here is the data retrieved from MITRE CVE for further analysis:
-        {mitre_data}
+        Additionally, here are the reference URLs for further analysis:
+        {ref_text}
 
-        Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability.
+        Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability based on the content of the referenced pages. Please confirm that the analysis was conducted based on the provided URLs and summarize the conclusions drawn.
         """
         
         # Debugowanie promptu
@@ -196,7 +107,7 @@ def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data):
             if 'response' in response:
                 text_response = response['response']
                 filtered_response = ''.join(char for char in text_response if not char.isdigit())
-                return filtered_response.strip()
+                return f"Ollama has analyzed the provided URLs and drawn conclusions:\n{filtered_response.strip()}"
             else:
                 print("No 'response' key in Ollama response.")
                 return "No valid response from Ollama."
@@ -207,8 +118,7 @@ def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data):
     except Exception as e:
         print(f"Error analyzing data with Ollama: {e}")
         return "No valid response from Ollama."
-        
-    
+
 def main():
     # Pobieranie raportów o podatnościach
     reports = fetch_security_reports()
@@ -217,49 +127,24 @@ def main():
         print("No security reports found.")
         return
     
-    # Znalezienie raportu o najwyższym wskaźniku CVSS
-    highest_cvss_report = max(reports, key=lambda r: float(r.get('vulnerability_score', 0)))
-    
-    # Pobieranie poziomu CVSS i opisu
-    cvss = highest_cvss_report.get('vulnerability_score', 'N/A')
-    description = highest_cvss_report.get('description', 'No description available')
-    
-    # Pobieranie wszystkich CVE z bazy danych
-    vulnerabilities = [report.get('vulnerability') for report in reports]
-    
-    # Pobieranie danych z Vulners API
-    cve = highest_cvss_report.get('vulnerability')
-    if cve is None:
-        print("CVE key is missing in highest CVSS report")
-        return
-    
-    vulners_data = fetch_vulners_data(cve)
-    if vulners_data is None:
-        print(f"Failed to fetch data from Vulners for CVE: {cve}")
-        vulners_analysis = "No data available from Vulners."
-    else:
-        # Przetwarzanie danych z Vulners
-        vulners_analysis = process_vulners_data(vulners_data)
-    
-    # Pobieranie danych z MITRE CVE API
-    mitre_data = fetch_mitre_data(cve)
-    if mitre_data is None:
-        mitre_analysis = "CVE not found in MITRE database."
-    else:
-        # Przetwarzanie danych z MITRE z przeszukiwaniem stron
-        mitre_analysis = process_mitre_data(mitre_data, vulnerabilities)
-    
-    # Analiza danych przy użyciu Ollama API
-    ollama_analysis = analyze_data_with_ollama(cve, cvss, description, vulners_analysis, mitre_analysis)
-    
-    # Wyświetl wyniki
-    print(f"Report for CVE: {cve}")
-    print("Ollama Analysis:")
-    if ollama_analysis:
-        print(ollama_analysis)  # Wyświetl odpowiedź Ollama
-    else:
-        print("No analysis available")
-    print("\n")
+    # Iterowanie przez wszystkie raporty
+    for report in reports:
+        cve = report.get('vulnerability')
+        cvss = report.get('vulnerability_score', 'N/A')
+        description = report.get('vulnerability_description', 'No description available')
+        
+        # Pobieranie danych z MITRE CVE API
+        mitre_data = fetch_mitre_data(cve)
+        description, ref_urls = process_mitre_data(mitre_data)
+        
+        # Analiza danych przy użyciu Ollama API
+        ollama_analysis = analyze_data_with_ollama(cve, cvss, description, ref_urls)
+        
+        # Wyświetl wyniki
+        print(f"Report for CVE: {cve}")
+        print("Ollama Analysis:")
+        print(ollama_analysis if ollama_analysis else "No analysis available")
+        print("\n")
 
 if __name__ == "__main__":
     main()
