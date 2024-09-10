@@ -124,74 +124,9 @@ def process_mitre_data(mitre_data):
     
     return analysis_results
 
-        # Funkcja pobierająca dane z Exploit-DB
-def fetch_exploit_db_data(cve):
-    url = f"https://www.exploit-db.com/search?q={cve}"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'
-    }
-    
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()  # Sprawdź, czy zapytanie zakończyło się błędem
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        table = soup.find('table', {'id': 'exploits-table'})
-        
-        
-        
-        # Sprawdzenie, czy tabela istnieje
-        if not table:
-            print("No exploits table found in Exploit-DB HTML.")
-            return None
-        
-        # Znalezienie wszystkich wierszy tabeli, bez względu na istnienie tbody
-        rows = table.find_all('tr')
-        if not rows:
-            return None
-        
-        # Zbieranie exploitów
-        exploits = []
-        for row in rows[1:6]:  # Pomijamy pierwszy wiersz, który zazwyczaj zawiera nagłówki
-            columns = row.find_all('td')
-            if len(columns) > 1:
-                title = columns[1].get_text(strip=True)
-                link = f"https://www.exploit-db.com{columns[1].find('a')['href']}"
-                date = columns[2].get_text(strip=True)
-                exploits.append({
-                    "title": title,
-                    "date": date,
-                    "link": link
-                })
-        
-        if not exploits:
-            return None
-        
-        return exploits
-    
-    except requests.RequestException as e:
-        print(f"Error fetching data from Exploit-DB: {e}")
-        return None
-
-def process_exploit_db_data(exploit_db_data):
-    if not exploit_db_data:
-        return "No exploits found for this CVE in Exploit-DB."
-
-    # Tworzenie listy exploitów
-    processed_exploits = []
-    for exploit in exploit_db_data:
-        title = exploit.get("title", "No title available")
-        date = exploit.get("date", "No date available")
-        link = exploit.get("link", "No link available")
-        
-        processed_exploits.append(f"Title: {title}\nDate: {date}\nLink: {link}")
-    
-    return "\n\n".join(processed_exploits)
-
 
 # Funkcja analizująca dane przy użyciu Ollama API
-def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data, exploit_db_data):
+def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data):
     try:
         # Sprawdzenie dostępności GPU
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -204,7 +139,7 @@ def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data, e
         client = ollama.Client()
         model_name = "llama3"
 
-        # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE, Feedly i Exploit-DB
+        # Konstruowanie promptu z uwzględnieniem danych z Vulners, MITRE
         prompt = f"""
         Here are the details of a vulnerability:
         CVE: {cve}
@@ -216,9 +151,6 @@ def analyze_data_with_ollama(cve, cvss, description, vulners_data, mitre_data, e
         
         Additionally, here is the data retrieved from MITRE CVE for further analysis:
         {mitre_data}
-
-        Additionally, here are the latest exploits found in Exploit-DB related to this CVE:
-        {exploit_db_data}
 
         Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability.
         """
@@ -284,14 +216,8 @@ def main():
         # Przetwarzanie danych z MITRE
         mitre_analysis = process_mitre_data(mitre_data)
     
-    # Pobieranie danych z Exploit-DB
-    exploit_db_data = fetch_exploit_db_data(cve)
-    if exploit_db_data is None:
-        print(f"Failed to fetch data from Exploit-DB for CVE: {cve}")
-        exploit_db_data = "No exploits found in Exploit-DB."
-    
     # Analiza danych przy użyciu Ollama API
-    ollama_analysis = analyze_data_with_ollama(cve, cvss, description, vulners_analysis, mitre_analysis, exploit_db_data)
+    ollama_analysis = analyze_data_with_ollama(cve, cvss, description, vulners_analysis, mitre_analysis)
     
     # Wyświetl wyniki
     print(f"Report for CVE: {cve}")
