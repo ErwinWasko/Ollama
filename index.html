@@ -6,8 +6,21 @@
     <title>Vulnerability Scanner Analysis</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        /* Resetowanie stylów */
-        * {
+        /* Kolory i zmienne */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #0056b3;
+    --background-color: #f5f7fa;
+    --text-color: #333;
+    --dark-bg-color: #181818;
+    --dark-text-color: #e4e4e4;
+    --card-bg-color: #ffffff;
+    --card-shadow: rgba(0, 0, 0, 0.1);
+    --border-radius: 8px;
+}
+
+/* Resetowanie stylów */
+* {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
@@ -205,7 +218,8 @@
         <label for="cvss">CVSS Score:</label>
         <select id="cvss">
             <option value="all">All</option>
-            <option value="high">High (7.0+)</option>
+            <option value="high">Critical (9.0+)</option>
+            <option value="high">High (7.0 - 8.9)</option>
             <option value="medium">Medium (4.0 - 6.9)</option>
             <option value="low">Low (0.1 - 3.9)</option>
         </select>
@@ -258,7 +272,7 @@
                             <p><strong>Description:</strong> ${data.description || 'No description available'}</p>
                             <div class="ollama-analysis">
                                 <strong>Ollama Analysis:</strong>
-                                <p>${data.ollama_analysis}</p>
+                                <p>${data.ollama_analysis || 'No analysis available'}</p>
                             </div>
                         `;
 
@@ -288,4 +302,3 @@
 
 </body>
 </html>
-
