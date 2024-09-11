@@ -240,6 +240,7 @@
         <div class="loading" id="loading">
             <span></span><span></span><span></span>
         </div>
+        <div id="no-reports-message" style="display: none;">No reports available for the selected filters.</div>
     </div>
 </main>
 
@@ -323,49 +324,51 @@ document.getElementById('apply-filters').addEventListener('click', function() {
 
         // Funkcja do przetwarzania tekstu
         function formatOllamaResponse(responseText) {
-            // Zamienia podwójne gwiazdki na nowe linie
-            return responseText
-                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>')
-                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
+        // Zamienia podwójne gwiazdki na nowe linie i pogrubiony tekst
+        return responseText
+        .replace(/\*\*(.*?)\*\*/g, '<br>**$1**<br>');  // Zastąpienie podwójnych gwiazdek
         }
 
         // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
         function fetchData() {
-            fetch('/fetch_reports')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.cve) {
-                        const card = document.createElement('div');
-                        card.classList.add('card');
+    fetch('/fetch_reports')
+        .then(response => response.json())
+        .then(data => {
+            if (data.cve) {
+                const card = document.createElement('div');
+                card.classList.add('card');
 
-                        card.innerHTML = `
-                            <h3><a href="${data.cve_link}" target="_blank">${data.cve}</a></h3>
-                            <p><strong>CVSS Score:</strong> ${data.cvss || 'N/A'}</p>
-                            <p><strong>Description:</strong> ${data.description || 'No description available'}</p>
-                            <div class="ollama-analysis">
-                                <strong>Ollama Analysis:</strong>
-                                <p>${data.ollama_analysis || 'No analysis available'}</p>
-                            </div>
-                        `;
+                // Formatowanie tekstu ollama_analysis przed jego wyświetleniem
+                const formattedAnalysis = formatOllamaResponse(data.ollama_analysis || 'No analysis available');
 
-                        resultsContainer.appendChild(card);
+                card.innerHTML = `
+                    <h3><a href="${data.cve_link}" target="_blank">${data.cve}</a></h3>
+                    <p><strong>CVSS Score:</strong> ${data.cvss || 'N/A'}</p>
+                    <p><strong>Description:</strong> ${data.description || 'No description available'}</p>
+                    <div class="ollama-analysis">
+                        <strong>Ollama Analysis:</strong>
+                        <p>${formattedAnalysis}</p>
+                    </div>
+                `;
 
-                        // Dodanie klasy, która uruchamia animację pojawienia się karty
-                        setTimeout(() => {
-                            card.classList.add('show');
-                        }, 100);
+                resultsContainer.appendChild(card);
 
-                        // Ponowne pobranie danych po przetworzeniu karty
-                        fetchData();
-                    } else {
-                        // Ukrycie wskaźnika ładowania, gdy brak dalszych danych
-                        loadingIndicator.style.display = 'none';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error fetching data:', error);
-                });
-        }
+                // Dodanie klasy, która uruchamia animację pojawienia się karty
+                setTimeout(() => {
+                    card.classList.add('show');
+                }, 100);
+
+                // Ponowne pobranie danych po przetworzeniu karty
+                fetchData();
+            } else {
+                // Ukrycie wskaźnika ładowania, gdy brak dalszych danych
+                loadingIndicator.style.display = 'none';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+        });
+}
 
         // Uruchomienie procesu pobierania danych przy starcie strony
         fetchData();
