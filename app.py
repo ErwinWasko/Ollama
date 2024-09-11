@@ -35,6 +35,8 @@ def fetch_reports():
         
         result = {
             'cve': cve,
+            'cvss': cvss,
+            'description': description,
             'ollama_analysis': ollama_analysis
         }
         
