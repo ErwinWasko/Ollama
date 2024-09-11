@@ -1,0 +1,197 @@
+/* Kolory i zmienne */
+:root {
+    --primary-color: #007bff;
+    --secondary-color: #0056b3;
+    --background-color: #f5f7fa;
+    --text-color: #333;
+    --dark-bg-color: #181818;
+    --dark-text-color: #e4e4e4;
+    --card-bg-color: #ffffff;
+    --card-shadow: rgba(0, 0, 0, 0.1);
+    --border-radius: 8px;
+}
+
+/* Resetowanie stylów */
+* {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        /* Panel boczny */
+        .sidebar {
+            width: 250px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 100px;
+        }
+
+        .sidebar h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar label {
+            display: block;
+            margin: 0.5rem 0;
+            font-weight: bold;
+        }
+
+        .sidebar select, .sidebar input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        /* Główna sekcja wyników */
+        .results {
+            flex: 1;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .card.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            color: #007bff;
+        }
+
+        .card p {
+            margin: 0.5rem 0;
+        }
+
+        .card .ollama-analysis {
+            background-color: #f0f0f0;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        /* Animacja ładowania */
+        .loading {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .loading span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin: 0 2px;
+            background-color: #007bff;
+            border-radius: 50%;
+            animation: bounce 0.6s infinite alternate;
+        }
+
+        .loading span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            to {
+                transform: translateY(-50%);
+            }
+        }
+
+        /* Stylowanie przycisków */
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Stylowanie trybu ciemnego */
+        body.dark-mode {
+            background-color: #181818;
+            color: #e4e4e4;
+        }
+
+        body.dark-mode header {
+            background-color: #242424;
+        }
+
+        body.dark-mode .sidebar {
+            background-color: #242424;
+        }
+
+        body.dark-mode .card {
+            background-color: #242424;
+        }
+
+        body.dark-mode button {
+            background-color: #0056b3;
+        }
+
+        /* Przyciski do zmiany trybu */
+        .toggle-mode {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .toggle-mode.dark {
+            color: #e4e4e4;
+        }
