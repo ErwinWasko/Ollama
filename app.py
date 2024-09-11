@@ -37,7 +37,8 @@ def fetch_reports():
             'cve': cve,
             'cvss': cvss,
             'description': description,
-            'ollama_analysis': ollama_analysis
+            'ollama_analysis': ollama_analysis,
+            'cve_link': f'https://www.cve.org/CVERecord?id={cve}'
         }
         
         if not current_reports:  # Sprawdzenie, czy wszystkie raporty zostały przetworzone
