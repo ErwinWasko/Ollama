@@ -324,9 +324,10 @@ document.getElementById('apply-filters').addEventListener('click', function() {
 
         // Funkcja do przetwarzania tekstu
         function formatOllamaResponse(responseText) {
-        // Zamienia podwójne gwiazdki na nowe linie i pogrubiony tekst
-        return responseText
-        .replace(/\*\*(.*?)\*\*/g, '<br>**$1**<br>');  // Zastąpienie podwójnych gwiazdek
+            // Zamienia podwójne gwiazdki na nowe linie
+            return responseText
+                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>')
+                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
         }
 
         // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
