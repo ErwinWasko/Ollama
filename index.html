@@ -1,23 +1,291 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ollama Analysis</title>
+    <title>Vulnerability Scanner Analysis</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        /* Resetowanie stylów */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        header {
+            background-color: #007bff;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            margin: 0;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 1.5rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        /* Panel boczny */
+        .sidebar {
+            width: 250px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+            position: sticky;
+            top: 100px;
+        }
+
+        .sidebar h2 {
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .sidebar label {
+            display: block;
+            margin: 0.5rem 0;
+            font-weight: bold;
+        }
+
+        .sidebar select, .sidebar input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        /* Główna sekcja wyników */
+        .results {
+            flex: 1;
+        }
+
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            transform: translateY(20px);
+            transition: all 0.3s ease;
+        }
+
+        .card.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .card h3 {
+            font-size: 1.5rem;
+            color: #007bff;
+        }
+
+        .card p {
+            margin: 0.5rem 0;
+        }
+
+        .card .ollama-analysis {
+            background-color: #f0f0f0;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+
+        /* Animacja ładowania */
+        .loading {
+            text-align: center;
+            padding: 2rem 0;
+        }
+
+        .loading span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            margin: 0 2px;
+            background-color: #007bff;
+            border-radius: 50%;
+            animation: bounce 0.6s infinite alternate;
+        }
+
+        .loading span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes bounce {
+            to {
+                transform: translateY(-50%);
+            }
+        }
+
+        /* Stylowanie przycisków */
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 0.7rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        /* Stylowanie trybu ciemnego */
+        body.dark-mode {
+            background-color: #181818;
+            color: #e4e4e4;
+        }
+
+        body.dark-mode header {
+            background-color: #242424;
+        }
+
+        body.dark-mode .sidebar {
+            background-color: #242424;
+        }
+
+        body.dark-mode .card {
+            background-color: #242424;
+        }
+
+        body.dark-mode button {
+            background-color: #0056b3;
+        }
+
+        /* Przyciski do zmiany trybu */
+        .toggle-mode {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+
+        .toggle-mode.dark {
+            color: #e4e4e4;
+        }
+    </style>
 </head>
 <body>
-    <h1>Ollama Analysis Results</h1>
-    {% if results %}
-        <ul>
-        {% for result in results %}
-            <li>
-                <strong>{{ result.cve }}</strong>: {{ result.ollama_analysis }}
-            </li>
-        {% endfor %}
-        </ul>
-    {% else %}
-        <p>No results found.</p>
-    {% endif %}
+
+<header>
+    <h1>Vulnerability Scanner Analysis</h1>
+    <i class="fas fa-moon toggle-mode" id="toggle-dark-mode"></i>
+</header>
+
+<main>
+    <div class="sidebar">
+        <h2>Filters</h2>
+        <label for="cvss">CVSS Score:</label>
+        <select id="cvss">
+            <option value="all">All</option>
+            <option value="high">High (7.0+)</option>
+            <option value="medium">Medium (4.0 - 6.9)</option>
+            <option value="low">Low (0.1 - 3.9)</option>
+        </select>
+
+        <label for="category">Category:</label>
+        <select id="category">
+            <option value="all">All</option>
+            <option value="web">Web</option>
+            <option value="network">Network</option>
+            <option value="system">System</option>
+        </select>
+
+        <button id="apply-filters">Apply Filters</button>
+    </div>
+
+    <div class="results">
+        <div class="loading" id="loading">
+            <span></span><span></span><span></span>
+        </div>
+    </div>
+</main>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const resultsContainer = document.querySelector('.results');
+        const loadingIndicator = document.getElementById('loading');
+        const toggleDarkMode = document.getElementById('toggle-dark-mode');
+
+        let darkMode = false;
+
+        // Przełączanie trybu ciemnego/jasnego
+        toggleDarkMode.addEventListener('click', () => {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark-mode');
+            toggleDarkMode.classList.toggle('dark');
+        });
+
+        // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
+        function fetchData() {
+            fetch('/fetch_reports')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.cve) {
+                        const card = document.createElement('div');
+                        card.classList.add('card');
+
+                        card.innerHTML = `
+                            <h3>${data.cve}</h3>
+                            <p><strong>CVSS Score:</strong> ${data.cvss || 'N/A'}</p>
+                            <p><strong>Description:</strong> ${data.description || 'No description available'}</p>
+                            <div class="ollama-analysis">
+                                <strong>Ollama Analysis:</strong>
+                                <p>${data.ollama_analysis}</p>
+                            </div>
+                        `;
+
+                        resultsContainer.appendChild(card);
+
+                        // Dodanie klasy, która uruchamia animację pojawienia się karty
+                        setTimeout(() => {
+                            card.classList.add('show');
+                        }, 100);
+
+                        // Ponowne pobranie danych po przetworzeniu karty
+                        fetchData();
+                    } else {
+                        // Ukrycie wskaźnika ładowania, gdy brak dalszych danych
+                        loadingIndicator.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                });
+        }
+
+        // Uruchomienie procesu pobierania danych przy starcie strony
+        fetchData();
+    });
+</script>
+
 </body>
 </html>
+
