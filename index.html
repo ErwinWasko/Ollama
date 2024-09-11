@@ -218,7 +218,7 @@
         <label for="cvss">CVSS Score:</label>
         <select id="cvss">
             <option value="all">All</option>
-            <option value="high">Critical (9.0+)</option>
+            <option value="critical">Critical (9.0+)</option>
             <option value="high">High (7.0 - 8.9)</option>
             <option value="medium">Medium (4.0 - 6.9)</option>
             <option value="low">Low (0.1 - 3.9)</option>
@@ -236,6 +236,7 @@
     </div>
 
     <div class="results">
+        <div id="reports-container">
         <div class="loading" id="loading">
             <span></span><span></span><span></span>
         </div>
@@ -243,6 +244,69 @@
 </main>
 
 <script>
+            // obsługa filtracji
+document.getElementById('apply-filters').addEventListener('click', function() {
+    const selectedCVSS = document.getElementById('cvss').value;
+    const selectedCategory = document.getElementById('category').value;
+
+    // Fetch reports from the server
+    fetch('/fetch_reports')
+        .then(response => response.json())
+        .then(data => {
+            const reportsContainer = document.getElementById('reports-container');
+            reportsContainer.innerHTML = ''; // Clear existing reports
+
+            data.forEach(report => {
+                let shouldDisplay = true;
+
+                // Apply CVSS filtering
+                if (selectedCVSS !== 'all') {
+                    const cvssScore = parseFloat(report.cvss) || 0;
+                    switch (selectedCVSS) {
+                        case 'low':
+                            if (cvssScore < 0.1 || cvssScore > 3.9) {
+                                shouldDisplay = false;
+                            }
+                            break;
+                        case 'medium':
+                            if (cvssScore < 4.0 || cvssScore > 6.9) {
+                                shouldDisplay = false;
+                            }
+                            break;
+                        case 'high':
+                            if (cvssScore < 7.0 || cvssScore > 8.9) {
+                                shouldDisplay = false;
+                            }
+                            break;
+                        case 'critical':
+                            if (cvssScore < 9.0 || cvssScore > 10.0) {
+                                shouldDisplay = false;
+                            }
+                            break;
+                    }
+                }
+
+                // Apply Category filtering
+                if (selectedCategory !== 'all' && report.category !== selectedCategory) {
+                    shouldDisplay = false;
+                }
+
+                // Display report if it matches filters
+                if (shouldDisplay) {
+                    const reportElement = document.createElement('div');
+                    reportElement.innerHTML = `
+                        <h3>${report.cve}</h3>
+                        <p><strong>CVSS Score:</strong> ${report.cvss}</p>
+                        <p><strong>Description:</strong> ${report.description}</p>
+                        <p><strong>Analysis:</strong> ${report.ollama_analysis}</p>
+                    `;
+                    reportsContainer.appendChild(reportElement);
+                }
+            });
+        })
+        .catch(error => console.error('Error fetching reports:', error));
+});
+
     document.addEventListener("DOMContentLoaded", function() {
         const resultsContainer = document.querySelector('.results');
         const loadingIndicator = document.getElementById('loading');
@@ -257,6 +321,14 @@
             toggleDarkMode.classList.toggle('dark');
         });
 
+        // Funkcja do przetwarzania tekstu
+        function formatOllamaResponse(responseText) {
+            // Zamienia podwójne gwiazdki na nowe linie
+            return responseText
+                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>')
+                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
+        }
+
         // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
         function fetchData() {
             fetch('/fetch_reports')
@@ -267,7 +339,7 @@
                         card.classList.add('card');
 
                         card.innerHTML = `
-                            <h3>${data.cve}</h3>
+                            <h3><a href="${data.cve_link}" target="_blank">${data.cve}</a></h3>
                             <p><strong>CVSS Score:</strong> ${data.cvss || 'N/A'}</p>
                             <p><strong>Description:</strong> ${data.description || 'No description available'}</p>
                             <div class="ollama-analysis">
