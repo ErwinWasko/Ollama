@@ -223,16 +223,6 @@
             <option value="medium">Medium (4.0 - 6.9)</option>
             <option value="low">Low (0.1 - 3.9)</option>
         </select>
-
-        <label for="category">Category:</label>
-        <select id="category">
-            <option value="all">All</option>
-            <option value="web">Web</option>
-            <option value="network">Network</option>
-            <option value="system">System</option>
-        </select>
-
-        <button id="apply-filters">Apply Filters</button>
     </div>
 
     <div class="results">
@@ -246,134 +236,117 @@
 
 <script>
             // obsługa filtracji
-document.getElementById('apply-filters').addEventListener('click', function() {
-    const selectedCVSS = document.getElementById('cvss').value;
-    const selectedCategory = document.getElementById('category').value;
+            document.addEventListener("DOMContentLoaded", function() {
+    const resultsContainer = document.querySelector('.results');
+    const loadingIndicator = document.getElementById('loading');
+    const toggleDarkMode = document.getElementById('toggle-dark-mode');
+    const cvssFilter = document.getElementById('cvss');
 
-    // Fetch reports from the server
-    fetch('/fetch_reports')
-        .then(response => response.json())
-        .then(data => {
-            const reportsContainer = document.getElementById('reports-container');
-            reportsContainer.innerHTML = ''; // Clear existing reports
+    let darkMode = false;
 
-            data.forEach(report => {
-                let shouldDisplay = true;
+    // Przełączanie trybu ciemnego/jasnego
+    toggleDarkMode.addEventListener('click', () => {
+        darkMode = !darkMode;
+        document.body.classList.toggle('dark-mode');
+        toggleDarkMode.classList.toggle('dark');
+    });
 
-                // Apply CVSS filtering
-                if (selectedCVSS !== 'all') {
-                    const cvssScore = parseFloat(report.cvss) || 0;
-                    switch (selectedCVSS) {
-                        case 'low':
-                            if (cvssScore < 0.1 || cvssScore > 3.9) {
-                                shouldDisplay = false;
-                            }
-                            break;
-                        case 'medium':
-                            if (cvssScore < 4.0 || cvssScore > 6.9) {
-                                shouldDisplay = false;
-                            }
-                            break;
-                        case 'high':
-                            if (cvssScore < 7.0 || cvssScore > 8.9) {
-                                shouldDisplay = false;
-                            }
-                            break;
-                        case 'critical':
-                            if (cvssScore < 9.0 || cvssScore > 10.0) {
-                                shouldDisplay = false;
-                            }
-                            break;
+    // Funkcja do przetwarzania tekstu
+    function formatOllamaResponse(responseText) {
+        return responseText
+            .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>')
+            .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
+    }
+
+    // Funkcja do filtrowania raportów na podstawie wybranego CVSS
+    function filterReportsByCVSS(report) {
+        const selectedCVSS = cvssFilter.value;
+        const cvssScore = parseFloat(report.cvss) || 0;
+
+        switch (selectedCVSS) {
+            case 'low':
+                return cvssScore >= 0.1 && cvssScore <= 3.9;
+            case 'medium':
+                return cvssScore >= 4.0 && cvssScore <= 6.9;
+            case 'high':
+                return cvssScore >= 7.0 && cvssScore <= 8.9;
+            case 'critical':
+                return cvssScore >= 9.0 && cvssScore <= 10.0;
+            default:
+                return true; // Wyświetla wszystkie raporty, gdy 'all' jest wybrane
+        }
+    }
+
+    // Funkcja do wyświetlania raportu
+    function displayReport(report) {
+        const card = document.createElement('div');
+        card.classList.add('card');
+
+        const formattedAnalysis = formatOllamaResponse(report.ollama_analysis || 'No analysis available');
+
+        card.innerHTML = `
+            <h3><a href="${report.cve_link}" target="_blank">${report.cve}</a></h3>
+            <p><strong>CVSS Score:</strong> ${report.cvss || 'N/A'}</p>
+            <p><strong>Description:</strong> ${report.description || 'No description available'}</p>
+            <div class="ollama-analysis">
+                <strong>Ollama Analysis:</strong>
+                <p>${formattedAnalysis}</p>
+            </div>
+        `;
+
+        resultsContainer.appendChild(card);
+
+        setTimeout(() => {
+            card.classList.add('show');
+        }, 100);
+    }
+
+    // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
+    function fetchData(continueFetching = true) {
+        fetch('/fetch_reports')
+            .then(response => response.json())
+            .then(data => {
+                let reportFound = false;
+
+                if (data.cve) {
+                    const shouldDisplay = filterReportsByCVSS(data);
+
+                    if (shouldDisplay) {
+                        displayReport(data);
+                        reportFound = true;
+                    }
+
+                    if (continueFetching) {
+                        setTimeout(fetchData, 500);
                     }
                 }
 
-                // Apply Category filtering
-                if (selectedCategory !== 'all' && report.category !== selectedCategory) {
-                    shouldDisplay = false;
+                // Jeśli nie znaleziono raportów dla wybranego filtra
+                if (!reportFound && !resultsContainer.hasChildNodes()) {
+                    resultsContainer.innerHTML = '<p>No reports found for the selected CVSS score.</p>';
                 }
 
-                // Display report if it matches filters
-                if (shouldDisplay) {
-                    const reportElement = document.createElement('div');
-                    reportElement.innerHTML = `
-                        <h3>${report.cve}</h3>
-                        <p><strong>CVSS Score:</strong> ${report.cvss}</p>
-                        <p><strong>Description:</strong> ${report.description}</p>
-                        <p><strong>Analysis:</strong> ${report.ollama_analysis}</p>
-                    `;
-                    reportsContainer.appendChild(reportElement);
-                }
-            });
-        })
-        .catch(error => console.error('Error fetching reports:', error));
-});
-
-    document.addEventListener("DOMContentLoaded", function() {
-        const resultsContainer = document.querySelector('.results');
-        const loadingIndicator = document.getElementById('loading');
-        const toggleDarkMode = document.getElementById('toggle-dark-mode');
-
-        let darkMode = false;
-
-        // Przełączanie trybu ciemnego/jasnego
-        toggleDarkMode.addEventListener('click', () => {
-            darkMode = !darkMode;
-            document.body.classList.toggle('dark-mode');
-            toggleDarkMode.classList.toggle('dark');
-        });
-
-        // Funkcja do przetwarzania tekstu
-        function formatOllamaResponse(responseText) {
-            // Zamienia podwójne gwiazdki na nowe linie
-            return responseText
-                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>')
-                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
-        }
-
-        // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
-        function fetchData() {
-    fetch('/fetch_reports')
-        .then(response => response.json())
-        .then(data => {
-            if (data.cve) {
-                const card = document.createElement('div');
-                card.classList.add('card');
-
-                // Formatowanie tekstu ollama_analysis przed jego wyświetleniem
-                const formattedAnalysis = formatOllamaResponse(data.ollama_analysis || 'No analysis available');
-
-                card.innerHTML = `
-                    <h3><a href="${data.cve_link}" target="_blank">${data.cve}</a></h3>
-                    <p><strong>CVSS Score:</strong> ${data.cvss || 'N/A'}</p>
-                    <p><strong>Description:</strong> ${data.description || 'No description available'}</p>
-                    <div class="ollama-analysis">
-                        <strong>Ollama Analysis:</strong>
-                        <p>${formattedAnalysis}</p>
-                    </div>
-                `;
-
-                resultsContainer.appendChild(card);
-
-                // Dodanie klasy, która uruchamia animację pojawienia się karty
-                setTimeout(() => {
-                    card.classList.add('show');
-                }, 100);
-
-                // Ponowne pobranie danych po przetworzeniu karty
-                fetchData();
-            } else {
                 // Ukrycie wskaźnika ładowania, gdy brak dalszych danych
+                if (!continueFetching) {
+                    loadingIndicator.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching data:', error);
                 loadingIndicator.style.display = 'none';
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching data:', error);
-        });
-}
+            });
+    }
 
-        // Uruchomienie procesu pobierania danych przy starcie strony
-        fetchData();
+    // Listener do wykrywania zmian w polu wyboru CVSS i aktualizowania raportów na bieżąco
+    cvssFilter.addEventListener('change', function() {
+        resultsContainer.innerHTML = ''; // Czyści obecne raporty
+        loadingIndicator.style.display = 'block'; // Pokazuje wskaźnik ładowania
+        fetchData(false); // Ponownie pobiera dane z zastosowanym filtrem
     });
+
+    // Uruchomienie procesu pobierania danych przy starcie strony
+    fetchData();
+});
 </script>
 
 </body>
