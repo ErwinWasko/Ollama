@@ -225,8 +225,8 @@
         </select>
     </div>
 
-    <div class="results">
-        <div id="reports-container">
+    <div class="results" id="resultsContainer">
+        <div id="results-container">
         <div class="loading" id="loading">
             <span></span><span></span><span></span>
         </div>
@@ -235,119 +235,119 @@
 </main>
 
 <script>
-            // obsługa filtracji
-            document.addEventListener("DOMContentLoaded", function() {
-    const resultsContainer = document.querySelector('.results');
-    const loadingIndicator = document.getElementById('loading');
-    const toggleDarkMode = document.getElementById('toggle-dark-mode');
-    const cvssFilter = document.getElementById('cvss');
-
-    let darkMode = false;
-
-    // Przełączanie trybu ciemnego/jasnego
-    toggleDarkMode.addEventListener('click', () => {
-        darkMode = !darkMode;
-        document.body.classList.toggle('dark-mode');
-        toggleDarkMode.classList.toggle('dark');
-    });
-
-    // Funkcja do przetwarzania tekstu
-    function formatOllamaResponse(responseText) {
-        return responseText
-            .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>')
-            .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
-    }
-
-    // Funkcja do filtrowania raportów na podstawie wybranego CVSS
-    function filterReportsByCVSS(report) {
-        const selectedCVSS = cvssFilter.value;
-        const cvssScore = parseFloat(report.cvss) || 0;
-
-        switch (selectedCVSS) {
-            case 'low':
-                return cvssScore >= 0.1 && cvssScore <= 3.9;
-            case 'medium':
-                return cvssScore >= 4.0 && cvssScore <= 6.9;
-            case 'high':
-                return cvssScore >= 7.0 && cvssScore <= 8.9;
-            case 'critical':
-                return cvssScore >= 9.0 && cvssScore <= 10.0;
-            default:
-                return true; // Wyświetla wszystkie raporty, gdy 'all' jest wybrane
+    document.addEventListener("DOMContentLoaded", function() {
+        const resultsContainer = document.getElementById('results-container');
+        const loadingIndicator = document.getElementById('loading');
+        const toggleDarkMode = document.getElementById('toggle-dark-mode');
+        const cvssFilter = document.getElementById('cvss');
+        let allReports = []; // Przechowuje wszystkie raporty
+    
+        let darkMode = false;
+    
+        if (!resultsContainer) {
+            console.error('Results container element not found');
+            return;
         }
-    }
-
-    // Funkcja do wyświetlania raportu
-    function displayReport(report) {
-        const card = document.createElement('div');
-        card.classList.add('card');
-
-        const formattedAnalysis = formatOllamaResponse(report.ollama_analysis || 'No analysis available');
-
-        card.innerHTML = `
-            <h3><a href="${report.cve_link}" target="_blank">${report.cve}</a></h3>
-            <p><strong>CVSS Score:</strong> ${report.cvss || 'N/A'}</p>
-            <p><strong>Description:</strong> ${report.description || 'No description available'}</p>
-            <div class="ollama-analysis">
-                <strong>Ollama Analysis:</strong>
-                <p>${formattedAnalysis}</p>
-            </div>
-        `;
-
-        resultsContainer.appendChild(card);
-
-        setTimeout(() => {
-            card.classList.add('show');
-        }, 100);
-    }
-
-    // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
-    function fetchData(continueFetching = true) {
-        fetch('/fetch_reports')
-            .then(response => response.json())
-            .then(data => {
-                let reportFound = false;
-
-                if (data.cve) {
-                    const shouldDisplay = filterReportsByCVSS(data);
-
-                    if (shouldDisplay) {
-                        displayReport(data);
-                        reportFound = true;
-                    }
-
-                    if (continueFetching) {
-                        setTimeout(fetchData, 500);
-                    }
+    
+        // Przełączanie trybu ciemnego/jasnego
+        toggleDarkMode.addEventListener('click', () => {
+            darkMode = !darkMode;
+            document.body.classList.toggle('dark-mode');
+            toggleDarkMode.classList.toggle('dark');
+        });
+    
+        // Funkcja do przetwarzania tekstu
+        function formatOllamaResponse(responseText) {
+            return responseText
+                .replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
+        }
+    
+        // Funkcja do wyświetlania raportu w formie karty
+        function displayReport(report) {
+            const card = document.createElement('div');
+            card.classList.add('card');
+    
+            const formattedAnalysis = formatOllamaResponse(report.ollama_analysis || 'No analysis available');
+    
+            card.innerHTML = `
+                <h3><a href="${report.cve_link}" target="_blank">${report.cve}</a></h3>
+                <p><strong>CVSS Score:</strong> ${report.cvss || 'N/A'}</p>
+                <p><strong>Description:</strong> ${report.description || 'No description available'}</p>
+                <div class="ollama-analysis">
+                    <strong>Ollama Analysis:</strong>
+                    <p>${formattedAnalysis}</p>
+                </div>
+            `;
+    
+            resultsContainer.appendChild(card);
+    
+            setTimeout(() => {
+                card.classList.add('show');
+            }, 100);
+        }
+    
+        // Funkcja do filtrowania raportów na podstawie wybranego CVSS
+        function applyFilter(cvssFilterValue) {
+            resultsContainer.innerHTML = ''; // Clear existing reports
+    
+            const filteredReports = allReports.filter(report => {
+                const cvssScore = parseFloat(report.cvss) || 0;
+    
+                switch (cvssFilterValue) {
+                    case 'low':
+                        return cvssScore >= 0.1 && cvssScore <= 3.9;
+                    case 'medium':
+                        return cvssScore >= 4.0 && cvssScore <= 6.9;
+                    case 'high':
+                        return cvssScore >= 7.0 && cvssScore <= 8.9;
+                    case 'critical':
+                        return cvssScore >= 9.0 && cvssScore <= 10.0;
+                    default:
+                        return true; // Wyświetla wszystkie raporty, gdy 'all' jest wybrane
                 }
-
-                // Jeśli nie znaleziono raportów dla wybranego filtra
-                if (!reportFound && !resultsContainer.hasChildNodes()) {
-                    resultsContainer.innerHTML = '<p>No reports found for the selected CVSS score.</p>';
-                }
-
-                // Ukrycie wskaźnika ładowania, gdy brak dalszych danych
-                if (!continueFetching) {
-                    loadingIndicator.style.display = 'none';
-                }
-            })
-            .catch(error => {
-                console.error('Error fetching data:', error);
-                loadingIndicator.style.display = 'none';
             });
-    }
-
-    // Listener do wykrywania zmian w polu wyboru CVSS i aktualizowania raportów na bieżąco
-    cvssFilter.addEventListener('change', function() {
-        resultsContainer.innerHTML = ''; // Czyści obecne raporty
-        loadingIndicator.style.display = 'block'; // Pokazuje wskaźnik ładowania
-        fetchData(false); // Ponownie pobiera dane z zastosowanym filtrem
+    
+            if (filteredReports.length > 0) {
+                filteredReports.forEach(report => {
+                    displayReport(report); // Wyświetl każdy przefiltrowany raport
+                });
+            } else {
+                resultsContainer.innerHTML = '<p>No reports found for the selected CVSS score.</p>';
+            }
+        }
+    
+        // Pobieranie danych z backendu i aktualizowanie strony na bieżąco
+        function fetchData() {
+            fetch('/fetch_reports')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.cve) {
+                        allReports.push(data); // Dodaj raport do allReports
+                        displayReport(data); // Wyświetl raport
+                        setTimeout(fetchData, 500); // Kontynuuj pobieranie danych
+                    } else {
+                        loadingIndicator.style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching data:', error);
+                    loadingIndicator.style.display = 'none';
+                });
+        }
+    
+        // Listener do wykrywania zmian w polu wyboru CVSS i aktualizowania raportów na bieżąco
+        cvssFilter.addEventListener('change', function() {
+            applyFilter(cvssFilter.value); // Zastosuj filtr na podstawie wartości CVSS
+        });
+    
+        // Uruchomienie procesu pobierania danych przy starcie strony
+        fetchData(); // Rozpocznij pobieranie danych
     });
+    </script>
+    
+    
+    
 
-    // Uruchomienie procesu pobierania danych przy starcie strony
-    fetchData();
-});
-</script>
 
 </body>
 </html>
