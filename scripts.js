@@ -6,6 +6,7 @@
     const cvssFilter = document.getElementById('cvss');
     const printPdfButton = document.getElementById('print-pdf');
     const printWordButton = document.getElementById('print-word');
+    const headerTitle = document.querySelector('header h1');
     let allReports = []; // Przechowuje wszystkie raporty
     let currentCvssFilter = 'all'; // Aktualny filtr CVSS
     let fetchingComplete = false; // Flaga do zatrzymania pobierania po zakończeniu
@@ -17,6 +18,10 @@
         document.body.classList.toggle('dark-mode');
         toggleDarkMode.classList.toggle('dark');
     });
+
+    function updateHeader(totalReports, maxCvss) {
+        headerTitle.innerHTML = `Vulnerability Scanner Analysis - Found ${totalReports} Vulnerabilities (Max CVSS: ${maxCvss})`;
+    }
 
     function formatOllamaResponse(responseText) {
         return responseText.replace(/\*\*(.*?)\*\*/g, '<br><strong>$1</strong><br>');
@@ -77,8 +82,9 @@
                     loadingIndicator.style.display = 'none'; // Ukryj wskaźnik ładowania
                     checkNoReportsMessage(); // Sprawdź, czy wyświetlić komunikat o braku raportów
                 } else {
-                    allReports.push(data); // Dodaj raport do allReports
+                    allReports.push(data.result); // Dodaj raport do allReports
                     applyFilter(currentCvssFilter); // Tylko wyświetl raporty zgodne z aktualnym filtrem CVSS
+                    updateHeader(data.total_reports, data.max_cvss);
                     setTimeout(fetchData, 500); // Kontynuuj pobieranie danych
                 }
             })
@@ -152,6 +158,18 @@
         .catch(error => console.error('Error generating Word:', error));
     });
 
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Animacja przycisku
+        gsap.from("#print-pdf", { duration: 1, y: -20, opacity: 0 });
+        gsap.from("#print-word", { duration: 1, y: -20, opacity: 0, delay: 0.2 });
+
+        // Animacja kart z raportami
+        document.querySelectorAll('.card').forEach((card, index) => {
+            gsap.from(card, { duration: 1, y: 30, opacity: 0, delay: index * 0.2 });
+        });
+    });
 
     fetchData(); // Rozpocznij pobieranie danych
 });
