@@ -1,150 +1,111 @@
-import mysql.connector
-from mysql.connector import Error
-import requests
-import ollama
-import torch
+from flask import Flask, render_template, jsonify, request, send_file
+import skaner
+import time
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
+import io
+from docx import Document
 
-# Funkcja łącząca się z bazą danych
-def connect_to_database():
-    try:
-        connection = mysql.connector.connect(
-            host='localhost',
-            database='test',
-            user='root',
-            password=''
-        )
-        return connection
-    except Error as e:
-        print(f"Error: {e}")
-        return None
+app = Flask(__name__)
 
-# Funkcja pobierająca raporty o podatnościach z bazy danych
-def fetch_security_reports():
-    connection = connect_to_database()
-    if connection is None:
-        return [], 0  # Zwraca pustą listę i 0, jeśli połączenie nie działa
+# Przechowuje bieżące raporty, które są analizowane
+current_reports = []
+all_reports_fetched = False
 
-    try:
-        cursor = connection.cursor()
-        query = """
-        SELECT * 
-        FROM vulnerabilities 
-        ORDER BY CAST(vulnerability_score AS DECIMAL(3,1)) DESC
-        """
-        cursor.execute(query)
-        columns = [desc[0] for desc in cursor.description]
-        results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        return results
-    except Error as e:
-        print(f"Error: {e}")
-        return [], 0
-    finally:
-        if connection:
-            cursor.close()
-            connection.close()
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-def fetch_mitre_data(cve):
-    url = f'https://cveawg.mitre.org/api/cve/{cve}'
-    try:
-        response = requests.get(url)
-        response.raise_for_status()
-        mitre_data = response.json()
-        
-        if mitre_data and 'cveMetadata' in mitre_data:
-            return mitre_data
-        else:
-            return None
-    except requests.RequestException as e:
-        print(f"Error fetching data from MITRE: {e}")
-        return None
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        return None
+@app.route('/fetch_reports')
+def fetch_reports():
+    global current_reports, all_reports_fetched
 
-def process_mitre_data(mitre_data):
-    if not mitre_data:
-        return "No data available", []
+    # Pobranie parametru cvss z żądania
+    selected_cvss = request.args.get('cvss', 'all')
 
-    description = mitre_data.get('containers', {}).get('cna', {}).get('descriptions', [{'value': 'No description available'}])[0]['value']
-    references = mitre_data.get('containers', {}).get('cna', {}).get('references', [])
+    # Inicjalizacja raportów, jeśli są puste i jeszcze nie pobraliśmy wszystkich
+    if not current_reports and not all_reports_fetched:
+        current_reports = skaner.fetch_security_reports()
+
+    # Sprawdzenie, czy wszystkie raporty zostały przetworzone
+    if all_reports_fetched or not current_reports:
+        return jsonify({'done': True})  # Zwróć informację o zakończeniu
+
+    # Przetwarzanie raportów jeden po drugim
+    report = current_reports.pop(0)  # Pobieramy pierwszy raport z listy
+    cve = report.get('vulnerability')
+    cvss = float(report.get('vulnerability_score', 0))
+    description = report.get('vulnerability_description', 'No description available')
+
+    # Jeśli raport spełnia warunki, przetwarzamy go
+    mitre_data = skaner.fetch_mitre_data(cve)
+    description, ref_urls = skaner.process_mitre_data(mitre_data)
+
+    # Pobieranie analizy Ollamy
+    ollama_analysis = skaner.analyze_data_with_ollama(cve, cvss, description, ref_urls)
+
+    result = {
+        'cve': cve,
+        'cvss': cvss,
+        'description': description,
+        'ollama_analysis': ollama_analysis,
+        'cve_link': f'https://www.cve.org/CVERecord?id={cve}'
+    }
+
+    # Sprawdzenie, czy przetworzono już wszystkie raporty
+    if not current_reports:
+        all_reports_fetched = True
+
+    return jsonify(result)
+
+# Funkcja do generowania pliku PDF
+@app.route('/generate_pdf_report', methods=['POST'])
+def generate_pdf_report():
+    data = request.json
+    reports = data.get('reports', [])
     
-    ref_urls = [ref['url'] for ref in references]
-    ref_text = "\n".join([f"- {url}" for url in ref_urls]) if ref_urls else "No references available."
-    
-    return description, ref_urls
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+    y_position = height - 50
 
-def analyze_data_with_ollama(cve, cvss, description, ref_urls):
-    try:
-        # Sprawdzenie dostępności GPU
-        torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        # Przygotowanie klienta Ollama
-        client = ollama.Client()
-        model_name = "llama3"
-
-        # Konstruowanie promptu z uwzględnieniem danych z MITRE i referencji
-        ref_text = "\n".join([f"- {url}" for url in ref_urls])
-        prompt = f"""
-        Here are the details of a vulnerability:
-        CVE: {cve}
-        CVSS Score: {cvss}
-        Description: {description}
-        
-        Additionally, here are the reference URLs for further analysis:
-        {ref_text}
-
-        Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability based on the content of the referenced pages. Please confirm that the analysis was conducted based on the provided URLs and summarize the conclusions drawn.
-        """
-        
-        # Debugowanie promptu
-        print("Prompt for Ollama:", prompt)
-        
-        # Analiza danych
-        response = client.generate(model=model_name, prompt=prompt)
-        
-        # Sprawdzamy strukturę odpowiedzi
-        if isinstance(response, dict):
-            if 'response' in response:
-                text_response = response['response']
-                filtered_response = ''.join(char for char in text_response if not char.isdigit())
-                return f"Ollama has analyzed the provided URLs and drawn conclusions:\n{filtered_response.strip()}"
-            else:
-                print("No 'response' key in Ollama response.")
-                return "No valid response from Ollama."
-        else:
-            print("Unexpected response format from Ollama.")
-            return "No valid response from Ollama."
-        
-    except Exception as e:
-        print(f"Error analyzing data with Ollama: {e}")
-        return "No valid response from Ollama."
-
-def main():
-    # Pobieranie raportów o podatnościach
-    reports = fetch_security_reports()
-    
-    if not isinstance(reports, list) or not reports:
-        print("No security reports found.")
-        return
-    
-    # Iterowanie przez wszystkie raporty
+    # Rysowanie każdego raportu
     for report in reports:
-        cve = report.get('vulnerability')
-        cvss = report.get('vulnerability_score', 'N/A')
-        description = report.get('vulnerability_description', 'No description available')
-        
-        # Pobieranie danych z MITRE CVE API
-        mitre_data = fetch_mitre_data(cve)
-        description, ref_urls = process_mitre_data(mitre_data)
-        
-        # Analiza danych przy użyciu Ollama API
-        ollama_analysis = analyze_data_with_ollama(cve, cvss, description, ref_urls)
-        
-        # Wyświetl wyniki
-        print(f"Report for CVE: {cve}")
-        print("Ollama Analysis:")
-        print(ollama_analysis if ollama_analysis else "No analysis available")
-        print("\n")
+        c.drawString(100, y_position, f"CVE: {report['cve']}")
+        c.drawString(100, y_position - 20, f"CVSS Score: {report['cvss']}")
+        c.drawString(100, y_position - 40, f"Description: {report['description']}")
+        c.drawString(100, y_position - 60, f"Ollama Analysis: {report['ollama_analysis']}")
+        y_position -= 100  # Przesunięcie w dół dla kolejnego raportu
+        if y_position < 100:
+            c.showPage()
+            y_position = height - 50
 
-if __name__ == "__main__":
-    main()
+    c.save()
+
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name="Raporty_CVSS.pdf", mimetype='application/pdf')
+
+# Funkcja do generowania pliku Word
+@app.route('/generate_word_report', methods=['POST'])
+def generate_word_report():
+    data = request.json
+    reports = data.get('reports', [])
+    
+    document = Document()
+    document.add_heading('Raporty CVSS', 0)
+
+    # Dodawanie każdego raportu do pliku Word
+    for report in reports:
+        document.add_heading(f'Report for {report["cve"]}', level=1)
+        document.add_paragraph(f'CVSS Score: {report["cvss"]}')
+        document.add_paragraph(f'Description: {report["description"]}')
+        document.add_paragraph(f'Ollama Analysis: {report["ollama_analysis"]}')
+        document.add_paragraph('')
+
+    buffer = io.BytesIO()
+    document.save(buffer)
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name="Raporty_CVSS.docx", mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+if __name__ == '__main__':
+    app.run(debug=True)
