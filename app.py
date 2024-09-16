@@ -27,22 +27,25 @@ def fetch_reports():
     if not current_reports and not all_reports_fetched:
         current_reports = skaner.fetch_security_reports()
 
+    total_reports = len(current_reports)  # Liczba raportów w bazie
+    max_cvss = max([float(report['vulnerability_score']) for report in current_reports]) if current_reports else 0  # Maksymalna podatność
+
     # Sprawdzenie, czy wszystkie raporty zostały przetworzone
     if all_reports_fetched or not current_reports:
-        return jsonify({'done': True})  # Zwróć informację o zakończeniu
+        return jsonify({
+            'done': True,
+            'total_reports': total_reports,
+            'max_cvss': max_cvss
+        })  # Zwróć informację o zakończeniu
 
     # Przetwarzanie raportów jeden po drugim
-    report = current_reports.pop(0)  # Pobieramy pierwszy raport z listy
+    report = current_reports.pop(0)
     cve = report.get('vulnerability')
     cvss = float(report.get('vulnerability_score', 0))
     description = report.get('vulnerability_description', 'No description available')
 
-    # Jeśli raport spełnia warunki, przetwarzamy go
-    mitre_data = skaner.fetch_mitre_data(cve)
-    description, ref_urls = skaner.process_mitre_data(mitre_data)
-
-    # Pobieranie analizy Ollamy
-    ollama_analysis = skaner.analyze_data_with_ollama(cve, cvss, description, ref_urls)
+    # Przetwarzanie analizy Ollamy
+    ollama_analysis = skaner.analyze_data_with_ollama(cve, cvss, description, [])
 
     result = {
         'cve': cve,
@@ -52,11 +55,15 @@ def fetch_reports():
         'cve_link': f'https://www.cve.org/CVERecord?id={cve}'
     }
 
-    # Sprawdzenie, czy przetworzono już wszystkie raporty
     if not current_reports:
         all_reports_fetched = True
 
-    return jsonify(result)
+    return jsonify({
+        'done': False,
+        'result': result,
+        'total_reports': total_reports,
+        'max_cvss': max_cvss
+    })
 
 # Funkcja do generowania pliku PDF
 @app.route('/generate_pdf_report', methods=['POST'])
