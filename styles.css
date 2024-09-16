@@ -11,187 +11,304 @@
     --border-radius: 8px;
 }
 
+body, .sidebar, .card, header {
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
 /* Resetowanie stylów */
 * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
 
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f5f7fa;
-            color: #333;
-            line-height: 1.6;
-        }
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f5f7fa;
+    color: #333;
+    line-height: 1.6;
+}
 
-        header {
-            background-color: #007bff;
-            color: white;
-            padding: 1rem;
-            text-align: center;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-        }
+header {
+    background-color: #007bff;
+    color: white;
+    padding: 1rem;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+}
 
-        header h1 {
-            font-size: 2rem;
-            margin: 0;
-        }
+header h1 {
+    font-size: 2rem;
+    margin: 0;
+}
 
-        main {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 1.5rem;
-            display: flex;
-            gap: 1.5rem;
-        }
+#header-info {
+    font-size: 0.8rem;  /* Małe litery */
+    text-transform: lowercase;  /* Wszystko małymi literami */
+    margin-right: 1rem;  /* Odstęp od prawego rogu */
+    white-space: nowrap;  /* Zapobiega łamaniu tekstu */
+}
 
-        /* Panel boczny */
-        .sidebar {
-            width: 250px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-            padding: 1.5rem;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
-            position: sticky;
-            top: 100px;
-        }
+main {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+    display: flex;
+    gap: 1.5rem;
+}
 
-        .sidebar h2 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-        }
+/* Panel boczny */
+.sidebar {
+    width: 250px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+    position: sticky;
+    top: 100px;
+}
 
-        .sidebar label {
-            display: block;
-            margin: 0.5rem 0;
-            font-weight: bold;
-        }
+.sidebar h2 {
+    font-size: 1.5rem;
+    margin-bottom: 1rem;
+}
 
-        .sidebar select, .sidebar input {
-            width: 100%;
-            padding: 0.5rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            margin-bottom: 1rem;
-        }
+.sidebar label {
+    display: block;
+    margin: 0.5rem 0;
+    font-weight: bold;
+}
 
-        /* Główna sekcja wyników */
-        .results {
-            flex: 1;
-        }
+.sidebar select, .sidebar input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
 
-        .card {
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            opacity: 0;
-            transform: translateY(20px);
-            transition: all 0.3s ease;
-        }
+/* Główna sekcja wyników */
+.results {
+    flex: 1;
+}
 
-        .card.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
+.results.grid .card {
+    display: inline-block;
+    width: 30%;
+    margin-right: 2%;
+    margin-bottom: 2rem;
+}
 
-        .card h3 {
-            font-size: 1.5rem;
-            color: #007bff;
-        }
+.results.list .card {
+    width: 100%;
+}
 
-        .card p {
-            margin: 0.5rem 0;
-        }
+.card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.05);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s ease;
+    animation: fadeIn 0.5s ease forwards;
+}
 
-        .card .ollama-analysis {
-            background-color: #f0f0f0;
-            padding: 1rem;
-            border-radius: 4px;
-            margin-top: 1rem;
-        }
+@keyframes fadeIn {
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
 
-        /* Animacja ładowania */
-        .loading {
-            text-align: center;
-            padding: 2rem 0;
-        }
+.card.show {
+    opacity: 1;
+    transform: translateY(0);
+}
 
-        .loading span {
-            display: inline-block;
-            width: 8px;
-            height: 8px;
-            margin: 0 2px;
-            background-color: #007bff;
-            border-radius: 50%;
-            animation: bounce 0.6s infinite alternate;
-        }
+.card h3 {
+    font-size: 1.5rem;
+    color: #007bff;
+}
 
-        .loading span:nth-child(2) {
-            animation-delay: 0.2s;
-        }
+.card p {
+    margin: 0.5rem 0;
+}
 
-        .loading span:nth-child(3) {
-            animation-delay: 0.4s;
-        }
+.card .ollama-analysis {
+    background-color: #f0f0f0;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+}
 
-        @keyframes bounce {
-            to {
-                transform: translateY(-50%);
-            }
-        }
+.card:hover {
+    transform: translateY(0) scale(1.05);
+    box-shadow: 0px 8px 15px rgba(0, 0, 0, 0.1);
+}
 
-        /* Stylowanie przycisków */
-        button {
-            background-color: #007bff;
-            color: white;
-            padding: 0.7rem 1.5rem;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-        }
+.card.collapsed {
+    height: 100px;
+    overflow: hidden;
+}
 
-        button:hover {
-            background-color: #0056b3;
-        }
+.card.expanded {
+    height: auto;
+    transition: height 0.4s ease;
+}
 
-        /* Stylowanie trybu ciemnego */
-        body.dark-mode {
-            background-color: #181818;
-            color: #e4e4e4;
-        }
+.card .details {
+    display: none;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
 
-        body.dark-mode header {
-            background-color: #242424;
-        }
+.card.expanded .details {
+    display: block;
+    max-height: 500px;
+}
 
-        body.dark-mode .sidebar {
-            background-color: #242424;
-        }
 
-        body.dark-mode .card {
-            background-color: #242424;
-        }
+/* Animacja ładowania */
+.loading {
+    text-align: center;
+    padding: 2rem 0;
+    display: block !important;
+}
 
-        body.dark-mode button {
-            background-color: #0056b3;
-        }
+.loading span {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin: 0 2px;
+    background-color: #007bff;
+    border-radius: 50%;
+    animation: bounce 0.6s infinite alternate;
+}
 
-        /* Przyciski do zmiany trybu */
-        .toggle-mode {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            font-size: 1.2rem;
-            cursor: pointer;
-        }
+.loading span:nth-child(2) {
+    animation-delay: 0.2s;
+}
 
-        .toggle-mode.dark {
-            color: #e4e4e4;
-        }
+.loading span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes bounce {
+    to {
+        transform: translateY(-50%);
+    }
+}
+
+/* Stylowanie przycisków */
+button {
+    background-color: #007bff;
+    color: white;
+    padding: 0.4rem 1rem;  
+    font-size: 0.85rem;     
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    height: auto;           
+    width: auto;            
+}
+
+button:hover {
+    background-color: #0056b3;
+    color: white;
+    transform: scale(1.05);
+}
+
+.button-container {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+button:active {
+    transform: scale(0.98);
+    background-color: var(--primary-color);
+}
+
+/* Stylowanie trybu ciemnego */
+body.dark-mode {
+    background-color: #181818;
+    color: #e4e4e4;
+}
+
+body.dark-mode header {
+    background-color: #242424;
+}
+
+body.dark-mode .sidebar {
+    background-color: #242424;
+}
+
+body.dark-mode .card {
+    background-color: #242424;
+}
+
+body.dark-mode button {
+    background-color: #0056b3;
+}
+
+/* Przyciski do zmiany trybu */
+.toggle-mode {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.toggle-mode.dark {
+    color: #e4e4e4;
+}
+
+.no-reports-message {
+    font-size: 18px;
+font-weight: bold;
+color: red; /* Tomato color for emphasis */
+text-align: center;
+padding: 20px;
+margin-top: 20px;
+background-color: #f9f9f9; /* Light gray background */
+border: 1px solid #ddd; /* Subtle border */
+border-radius: 5px; /* Rounded corners */
+box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Light shadow for depth */
+}
+
+.sidebar select {
+    border: 2px solid var(--primary-color);
+    transition: border-color 0.3s ease;
+}
+
+.sidebar select:focus {
+    border-color: var(--secondary-color);
+}
+
+.pagination {
+    display: flex;
+    justify-content: center;
+    margin-top: 20px;
+}
+
+.pagination button {
+    margin: 0 5px;
+    padding: 10px 20px;
+    background-color: var(--primary-color);
+    border: none;
+    color: white;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.pagination button:hover {
+    background-color: var(--secondary-color);
+}
