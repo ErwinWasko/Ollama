@@ -52,11 +52,11 @@ document.addEventListener("DOMContentLoaded", function() {
                 const ctx = document.getElementById('vulnerabilityChart').getContext('2d');
 
                 const chartData = {
-                    labels: ['Critical', 'High', 'Medium', 'Low'], // Nazwy kategorii CVSS
+                    labels: ['Vulnerabilities'], // Nazwa wspólnej osi X (np. "Podatności")
                     datasets: [
                         {
                             label: 'Critical',
-                            data: [criticalData, 0, 0, 0], // Dane dla Critical
+                            data: [criticalData],  // Dane dla kategorii Critical
                             backgroundColor: 'rgba(255, 0, 0, 0.6)',  // Czerwony
                             borderColor: 'rgba(255, 0, 0, 1)',
                             borderWidth: 2,
@@ -65,7 +65,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         },
                         {
                             label: 'High',
-                            data: [0, highData, 0, 0], // Dane dla High
+                            data: [highData],  // Dane dla kategorii High
                             backgroundColor: 'rgba(255, 132, 19, 0.6)',  // Pomarańczowy
                             borderColor: 'rgba(255, 132, 19, 1)',
                             borderWidth: 2,
@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         },
                         {
                             label: 'Medium',
-                            data: [0, 0, mediumData, 0], // Dane dla Medium
+                            data: [mediumData],  // Dane dla kategorii Medium
                             backgroundColor: 'rgba(255, 239, 0, 0.6)',  // Żółty
                             borderColor: 'rgba(255, 239, 0, 1)',
                             borderWidth: 2,
@@ -83,9 +83,9 @@ document.addEventListener("DOMContentLoaded", function() {
                         },
                         {
                             label: 'Low',
-                            data: [0, 0, 0, lowData], // Dane dla Low
+                            data: [lowData],  // Dane dla kategorii Low
                             backgroundColor: 'rgba(57, 255, 20, 0.6)',  // Zielony
-                            borderColor: 'rgba(57, 255, 20, 0.6)',
+                            borderColor: 'rgba(57, 255, 20, 1)',
                             borderWidth: 2,
                             borderRadius: 5,
                             borderSkipped: false
@@ -94,7 +94,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 };
 
                 const config = {
-                    type: 'bar',  // Możesz zmienić typ wykresu na 'line', 'pie', itp.
+                    type: 'bar',  // Typ wykresu
                     data: chartData,
                     options: {
                         responsive: true,
@@ -111,7 +111,7 @@ document.addEventListener("DOMContentLoaded", function() {
                             },
                             title: {
                                 display: true,
-                                text: 'Analiza Podatności wg CVSS',
+                                text: 'Znalezione podatności w bazie danych',
                                 font: {
                                     size: 18
                                 },
