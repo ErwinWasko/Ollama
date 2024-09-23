@@ -1,5 +1,4 @@
-
-    document.addEventListener("DOMContentLoaded", function() {
+document.addEventListener("DOMContentLoaded", function() {
     const resultsContainer = document.getElementById('results-container');
     const loadingIndicator = document.getElementById('loading');
     const toggleDarkMode = document.getElementById('toggle-dark-mode');
@@ -10,6 +9,7 @@
     let allReports = []; // Przechowuje wszystkie raporty
     let currentCvssFilter = 'all'; // Aktualny filtr CVSS
     let fetchingComplete = false; // Flaga do zatrzymania pobierania po zakończeniu
+    let headerUpdated = false; // Flaga, aby wywołać updateHeader tylko raz
 
     let darkMode = false;
 
@@ -20,7 +20,8 @@
     });
 
     function updateHeader(totalReports, maxCvss) {
-        headerTitle.innerHTML = `Vulnerability Scanner Analysis - Found ${totalReports} Vulnerabilities (Max CVSS: ${maxCvss})`;
+        const headerInfo = document.getElementById('header-info');
+        headerInfo.innerHTML = `Found ${totalReports} Vulnerabilities (Max CVSS: ${maxCvss})`;
     }
 
     function formatOllamaResponse(responseText) {
@@ -51,23 +52,18 @@
     }
 
     function applyFilter(cvssFilterValue) {
-                resultsContainer.innerHTML = '';
-                allReports.filter(report => {
-                    const cvssScore = parseFloat(report.cvss) || 0;
-                    switch (cvssFilterValue) {
-                        case 'low': return cvssScore >= 0.1 && cvssScore <= 3.9;
-                        case 'medium': return cvssScore >= 4.0 && cvssScore <= 6.9;
-                        case 'high': return cvssScore >= 7.0 && cvssScore <= 8.9;
-                        case 'critical': return cvssScore >= 9.0 && cvssScore <= 10.0;
-                        default: return true;
-                    }
-                }).forEach(displayReport);
+        resultsContainer.innerHTML = '';
+        allReports.filter(report => {
+            const cvssScore = parseFloat(report.cvss) || 0;
+            switch (cvssFilterValue) {
+                case 'low': return cvssScore >= 0.1 && cvssScore <= 3.9;
+                case 'medium': return cvssScore >= 4.0 && cvssScore <= 6.9;
+                case 'high': return cvssScore >= 7.0 && cvssScore <= 8.9;
+                case 'critical': return cvssScore >= 9.0 && cvssScore <= 10.0;
+                default: return true;
             }
-
-            cvssFilter.addEventListener('change', function() {
-                currentCvssFilter = cvssFilter.value;
-                applyFilter(currentCvssFilter);
-            });
+        }).forEach(displayReport);
+    }
 
     function fetchData() {
         if (fetchingComplete) return; // Zatrzymaj pobieranie, jeśli przetwarzanie jest zakończone
@@ -84,7 +80,13 @@
                 } else {
                     allReports.push(data.result); // Dodaj raport do allReports
                     applyFilter(currentCvssFilter); // Tylko wyświetl raporty zgodne z aktualnym filtrem CVSS
-                    updateHeader(data.total_reports, data.max_cvss);
+                    
+                    // Zaktualizuj header tylko raz, przy pierwszym wczytaniu danych
+                    if (!headerUpdated) {
+                        updateHeader(data.total_reports, data.max_cvss);
+                        headerUpdated = true; // Ustaw flagę, aby nie aktualizować nagłówka ponownie
+                    }
+
                     setTimeout(fetchData, 500); // Kontynuuj pobieranie danych
                 }
             })
@@ -158,20 +160,6 @@
         .catch(error => console.error('Error generating Word:', error));
     });
 
-
-
-    document.addEventListener('DOMContentLoaded', () => {
-        // Animacja przycisku
-        gsap.from("#print-pdf", { duration: 1, y: -20, opacity: 0 });
-        gsap.from("#print-word", { duration: 1, y: -20, opacity: 0, delay: 0.2 });
-
-        // Animacja kart z raportami
-        document.querySelectorAll('.card').forEach((card, index) => {
-            gsap.from(card, { duration: 1, y: 30, opacity: 0, delay: index * 0.2 });
-        });
-    });
-
-    fetchData(); // Rozpocznij pobieranie danych
+    // Uruchom fetchData, aby rozpocząć pobieranie danych
+    fetchData();
 });
-
-        
