@@ -44,6 +44,37 @@ def fetch_security_reports():
             cursor.close()
             connection.close()
 
+def fetch_vulnerability_details(cve):
+    connection = connect_to_database()
+    if connection is None:
+        return None
+
+    try:
+        cursor = connection.cursor()
+        query = """
+        SELECT vulnerability_score, vulnerability_description
+        FROM vulnerabilities 
+        WHERE vulnerability = %s
+        """
+        cursor.execute(query, (cve,))
+        result = cursor.fetchone()
+
+        if result:
+            # Rozdzielamy wyniki na odpowiednie zmienne
+            cvss_score = result[0]
+            description = result[1]
+            return cvss_score, description  
+        else:
+            return None
+
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
 def fetch_mitre_data(cve):
     url = f'https://cveawg.mitre.org/api/cve/{cve}'
     try:
@@ -145,6 +176,40 @@ def main():
         print("Ollama Analysis:")
         print(ollama_analysis if ollama_analysis else "No analysis available")
         print("\n")
+
+        # Funkcja generująca scenariusz ataku za pomocą LLaMA 3
+def generate_attack_scenario(cve, cvss_score, description):
+    try:
+        # Sprawdzenie dostępności GPU
+        torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+        # Przygotowanie klienta Ollama
+        client = ollama.Client()
+        model_name = "llama3"
+
+        # Konstrukcja promptu dla modelu z dodatkowymi danymi (bez ref_urls)
+        prompt = f"""
+        Generate a step-by-step attack scenario for the following vulnerability:
+        CVE: {cve}
+        CVSS Score: {cvss_score}
+        Description: {description}
+
+        Include steps for discovery, exploitation, privilege escalation, and impact.
+        """
+
+        # Generowanie odpowiedzi od LLaMA 3
+        response = client.generate(model=model_name, prompt=prompt)
+
+        if isinstance(response, dict) and 'response' in response:
+            text_response = response['response']
+            steps = text_response.split('\n')
+            return steps
+        else:
+            return ["No valid response from LLaMA."]
+    
+    except Exception as e:
+        print(f"Error generating attack scenario: {e}")
+        return ["Error generating attack scenario."]
 
 if __name__ == "__main__":
     main()
