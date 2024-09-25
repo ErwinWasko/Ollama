@@ -32,6 +32,36 @@
         <button id="print-word">Print to Word</button>
         <button id="show-chart">Wykres</button>
         </div>
+        <div class="button-container">
+            <br>
+            <h2>Attack simulation</h2>
+            <label for="cve-select">Wybierz CVE:</label>
+            <select id="cve-select">
+                <option value="">Wybierz CVE...</option>
+                <!-- Opcje zostaną wypełnione dynamicznie z backendu -->
+            </select>
+            <button id="open-simulation">Symuluj atak</button>
+        </div>
+    </div>
+
+    <div id="simulation-modal" class="modal">
+        <div class="modal-content">
+            <span id="close-simulation" class="close">&times;</span>
+            <h2>Symulacja ataku</h2>
+    
+            <!-- SVG for simulation -->
+            <div id="svg-container">
+                <svg id="attack-simulation" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 100">
+                    <line id="attack-line1" x1="10" y1="20" x2="190" y2="20" stroke="#007bff" stroke-width="4" stroke-dasharray="180" stroke-dashoffset="180" />
+                    <line id="attack-line2" x1="10" y1="40" x2="190" y2="40" stroke="#0056b3" stroke-width="4" stroke-dasharray="180" stroke-dashoffset="180" />
+                    <circle id="server" cx="50" cy="70" r="10" fill="#fff" stroke="#000" stroke-width="2" />
+                    <circle id="workstation" cx="150" cy="70" r="10" fill="#fff" stroke="#000" stroke-width="2" />
+                </svg>
+            </div>
+    
+            <!-- Attack steps will be displayed here -->
+            <div id="simulation-steps"></div>
+        </div>
     </div>
 
     <div class="results" id="resultsContainer">
@@ -39,6 +69,15 @@
         <div class="loading" id="loading">
             <span></span><span></span><span></span>
         </div>
+    </div>
+
+    <div id="chatbot">
+        <h2>Chatbot - Zadaj pytanie</h2>
+        <div id="chat-window">
+            <div id="chat-messages"></div>
+        </div>
+        <input type="text" id="chat-input" placeholder="Wpisz pytanie..." />
+        <button id="send-message">Wyślij</button>
     </div>
 </main>
 
@@ -48,6 +87,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.9.1/gsap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="/static/wykresy.js"></script>
+    <script src="/static/simulation.js"></script>
 
 
 </body>
