@@ -1,12 +1,17 @@
 from flask import Flask, render_template, jsonify, request, send_file
 import skaner
-import time
+import ollama
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import io
 from docx import Document
+import mysql.connector
+from mysql.connector import Error
 
 app = Flask(__name__)
+
+client = ollama.Client()
+model_name = "llama3"
 
 # Przechowuje bieżące raporty, które są analizowane
 current_reports = []
@@ -15,6 +20,32 @@ all_reports_fetched = False
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/ask_chatbot', methods=['POST'])
+def ask_chatbot():
+    try:
+        # Pobierz pytanie z frontendu
+        data = request.json
+        user_input = data.get('question')
+        
+        # Debug: wyświetlenie pytania, aby upewnić się, że dane docierają do serwera
+        print(f"Received question: {user_input}")
+
+        if not user_input:
+            return jsonify({'error': 'Nie podano pytania'}), 400
+
+        # Wywołanie funkcji z pliku skaner.py, która analizuje pytanie
+        response = skaner.analyze_data_with_ollama(user_input, 0, '', [])
+
+        # Debug: wyświetlenie odpowiedzi, aby upewnić się, że Ollama działa poprawnie
+        print(f"Ollama response: {response}")
+
+        return jsonify({'answer': response})
+    
+    except Exception as e:
+        # Debugowanie w razie błędu
+        print(f"Błąd podczas przetwarzania zapytania: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/fetch_reports')
 def fetch_reports():
@@ -113,6 +144,104 @@ def generate_word_report():
     document.save(buffer)
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name="Raporty_CVSS.docx", mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+
+
+@app.route('/fetch_chart_data')
+def fetch_chart_data():
+    # Połącz się z bazą danych i pobierz raporty
+    reports = skaner.fetch_security_reports()
+
+    if not reports:
+        return jsonify({'error': 'No data available'})
+
+    # Grupowanie raportów według zakresów CVSS
+    cvss_ranges = {
+        'Low': 0,
+        'Medium': 0,
+        'High': 0,
+        'Critical': 0
+    }
+
+    for report in reports:
+        score = float(report.get('vulnerability_score', 0))
+        if 0.1 <= score <= 3.9:
+            cvss_ranges['Low'] += 1
+        elif 4.0 <= score <= 6.9:
+            cvss_ranges['Medium'] += 1
+        elif 7.0 <= score <= 8.9:
+            cvss_ranges['High'] += 1
+        elif 9.0 <= score <= 10.0:
+            cvss_ranges['Critical'] += 1
+
+    return jsonify({
+        'cvss_ranges': cvss_ranges
+    })
+
+# Funkcja łącząca się z bazą danych
+def connect_to_database():
+    try:
+        connection = mysql.connector.connect(
+            host='localhost',
+            database='test',
+            user='root',
+            password=''
+        )
+        return connection
+    except Error as e:
+        print(f"Error: {e}")
+        return None
+
+# Funkcja pobierająca listę podatności (CVE) z bazy danych
+def fetch_cve_list():
+    connection = connect_to_database()
+    if connection is None:
+        return []
+
+    try:
+        cursor = connection.cursor()
+        query = "SELECT vulnerability FROM vulnerabilities"
+        cursor.execute(query)
+        results = [row[0] for row in cursor.fetchall()]
+        return results
+    except Error as e:
+        print(f"Błąd podczas pobierania CVE: {e}")
+        return []
+    finally:
+        if connection:
+            cursor.close()
+            connection.close()
+
+@app.route('/get_cve_list', methods=['GET'])
+def get_cve_list():
+    # Pobierz listę CVE z bazy danych
+    cve_list = fetch_cve_list()
+    
+    if not cve_list:
+        return jsonify({'error': 'Brak podatności w bazie danych'}), 500
+    
+    return jsonify({'cve_list': cve_list})
+
+@app.route('/simulate_attack', methods=['POST'])
+def simulate_attack():
+    data = request.json
+    vulnerability = data.get('vulnerability')
+
+    if not vulnerability:
+        return jsonify({'error': 'Brak podatności'}), 400
+
+    # Pobieramy szczegóły podatności z bazy danych
+    vulnerability_details = skaner.fetch_vulnerability_details(vulnerability)
+
+    if not vulnerability_details:
+        return jsonify({'error': 'Nie znaleziono szczegółów dla podanego CVE'}), 404
+
+    # Rozpakowanie wyników z bazy danych
+    cvss_score, description = vulnerability_details  
+
+    # Generowanie scenariusza ataku z dodatkowymi danymi
+    attack_scenario = skaner.generate_attack_scenario(vulnerability, cvss_score, description)
+    
+    return jsonify({'steps': attack_scenario})
 
 if __name__ == '__main__':
     app.run(debug=True)
