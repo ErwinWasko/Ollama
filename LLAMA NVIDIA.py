@@ -108,7 +108,7 @@ def analyze_data_with_nvidia_llama(cve, cvss, description, ref_urls):
         # Przygotowanie klienta NVIDIA LLaMA
         client = OpenAI(
             base_url = "https://integrate.api.nvidia.com/v1",
-            api_key = "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"
+            api_key = "n"
         )
 
         # Konstruowanie wiadomości
@@ -149,7 +149,7 @@ def generate_attack_scenario(cve, cvss_score, description):
         # Przygotowanie klienta NVIDIA LLaMA
         client = OpenAI(
             base_url = "https://integrate.api.nvidia.com/v1",
-            api_key = "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"
+            api_key = "n"
         )
 
         # Konstrukcja promptu dla modelu
