@@ -229,7 +229,7 @@ button {
     cursor: pointer;
     transition: background-color 0.3s ease;
     height: auto;           
-    width: auto;            
+    width: 200px;            
 }
 
 button:hover {
@@ -242,6 +242,7 @@ button:hover {
     display: flex;
     gap: 10px;
     margin-top: 10px;
+    flex-direction: column;
 }
 
 button:active {
@@ -324,4 +325,168 @@ box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Light shadow for depth */
 
 .pagination button:hover {
     background-color: var(--secondary-color);
+}
+
+#chatbot {
+    margin-top: 30px;
+    background-color: #f1f1f1;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+#chat-window {
+    height: 300px;
+    overflow-y: scroll;
+    background-color: white;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+#chat-messages {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-message {
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 8px;
+}
+
+.user-message {
+    background-color: #007bff;
+    color: white;
+    align-self: flex-end;
+}
+
+.bot-message {
+    background-color: #f0f0f0;
+    color: black;
+    align-self: flex-start;
+}
+
+#chat-input {
+    width: calc(100% - 120px);
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+
+#send-message {
+    padding: 10px 15px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#send-message:hover {
+    background-color: #0056b3;
+}
+
+/* Stylizacja dla kontenera symulacji SVG */
+#svg-container {
+    margin-top: 20px;
+    text-align: center;
+    padding: 20px;  /* Dodanie wewnętrznych odstępów */
+    background-color: #f9f9f9;  /* Jasne tło dla lepszej widoczności */
+    border-radius: 10px;  /* Zaokrąglone rogi */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);  /* Lekki cień dla głębi */
+    border: 1px solid #ddd;  /* Delikatna ramka */
+}
+
+#attack-simulation {
+    width: 100%;
+    height: auto;
+    max-width: 800px;  /* Maksymalna szerokość dla SVG */
+    margin: 0 auto;  /* Wycentrowanie SVG w kontenerze */
+    display: block;
+    padding: 10px;
+    background-color: white;  /* Białe tło dla SVG */
+    border: 2px solid var(--primary-color);  /* Akcentująca ramka */
+    border-radius: 10px;  /* Zaokrąglone rogi */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);  /* Mocniejszy cień dla SVG */
+}
+
+#simulation-steps {
+    margin-top: 20px;
+    padding: 20px;  /* Odstępy wokół kroków symulacji */
+    background-color: #f1f1f1;  /* Jasnoszare tło */
+    border-radius: 10px;  /* Zaokrąglone rogi */
+    border: 1px solid #ddd;  /* Delikatna ramka */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);  /* Lekki cień */
+    font-family: 'Arial', sans-serif;
+}
+
+#simulation-steps p {
+    margin-bottom: 10px;  /* Dodanie odstępu między krokami symulacji */
+    font-size: 16px;
+    color: #333;
+}
+
+#simulation-steps p span.step-number {
+    font-weight: bold;
+    color: var(--primary-color);  /* Podkreślenie numeru kroku */
+}
+
+#simulation-steps p::before {
+    content: "⚡ ";  /* Ikonka przed każdym krokiem */
+    color: var(--primary-color);
+}
+
+#svg-container h2 {
+    font-size: 24px;
+    color: var(--primary-color);
+    margin-bottom: 20px;
+    font-weight: bold;
+}
+
+.modal {
+    display: none; /* Ukryj modal na początku */
+    position: fixed; 
+    z-index: 1000; /* Ustaw pop-up nad innymi elementami */
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.4); /* Przezroczyste tło */
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 10% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 800px; /* Maksymalna szerokość modala */
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    animation: fadeIn 0.3s ease-in-out; /* Animacja pojawiania się */
+}
+
+/* Animacja pojawiania się modala */
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Przycisk zamykający modal */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
 }
