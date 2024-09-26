@@ -28,20 +28,21 @@ def ask_chatbot():
         # Pobierz pytanie z frontendu
         data = request.json
         user_input = data.get('question')
-        
-        # Debug: wyświetlenie pytania, aby upewnić się, że dane docierają do serwera
-        print(f"Received question: {user_input}")
 
         if not user_input:
             return jsonify({'error': 'Nie podano pytania'}), 400
 
-        # Wywołanie funkcji z pliku skaner.py, która analizuje pytanie
-        response = skaner.analyze_data_with_ollama(user_input, 0, '', [])
+        # Przygotowanie klienta Ollama
+        client = ollama.Client()
+        model_name = "llama3"
 
-        # Debug: wyświetlenie odpowiedzi, aby upewnić się, że Ollama działa poprawnie
-        print(f"Ollama response: {response}")
+        # Wywołanie modelu z wpisanym przez użytkownika pytaniem
+        response = client.generate(model=model_name, prompt=user_input)
 
-        return jsonify({'answer': response})
+        if isinstance(response, dict) and 'response' in response:
+            return jsonify({'answer': response['response']})
+        else:
+            return jsonify({'error': 'Nie otrzymano odpowiedzi od modelu'}), 500
     
     except Exception as e:
         # Debugowanie w razie błędu
