@@ -1,11 +1,12 @@
 document.addEventListener("DOMContentLoaded", function() {
     const resultsContainer = document.getElementById('results-container');
+    const generateButton = document.getElementById('generate-btn');
+    const stopButton = document.getElementById('stop-btn');
     const loadingIndicator = document.getElementById('loading');
     const toggleDarkMode = document.getElementById('toggle-dark-mode');
     const cvssFilter = document.getElementById('cvss');
     const printPdfButton = document.getElementById('print-pdf');
     const printWordButton = document.getElementById('print-word');
-    const headerTitle = document.querySelector('header h1');
     let allReports = []; // Przechowuje wszystkie raporty
     let currentCvssFilter = 'all'; // Aktualny filtr CVSS
     let fetchingComplete = false; // Flaga do zatrzymania pobierania po zakończeniu
@@ -51,9 +52,18 @@ document.addEventListener("DOMContentLoaded", function() {
         }, 100);
     }
 
+    // Funkcja do zatrzymania generowania raportów
+    function stopGenerating() {
+        fetchingComplete = true;  // Ustawienie flagi, aby zatrzymać pobieranie
+        console.log('Report generation stopped');
+    }
+
+    generateButton.addEventListener('click', fetchData);
+    stopButton.addEventListener('click', stopGenerating);
+
     function applyFilter(cvssFilterValue) {
-        resultsContainer.innerHTML = '';
-        allReports.filter(report => {
+        resultsContainer.innerHTML = '';  // Wyczyść poprzednie wyniki
+        const filteredReports = allReports.filter(report => {
             const cvssScore = parseFloat(report.cvss) || 0;
             switch (cvssFilterValue) {
                 case 'low': return cvssScore >= 0.1 && cvssScore <= 3.9;
@@ -62,7 +72,18 @@ document.addEventListener("DOMContentLoaded", function() {
                 case 'critical': return cvssScore >= 9.0 && cvssScore <= 10.0;
                 default: return true;
             }
-        }).forEach(displayReport);
+        });
+
+        // Jeśli po zastosowaniu filtra nie znaleziono raportów
+        if (filteredReports.length === 0) {
+            resultsContainer.innerHTML = `
+                <p class="no-reports-message">
+                    <span class="warning-icon">⚠️</span> Nie znaleziono CVE dla tego filtra.
+                </p>`;
+        } else {
+            // Wyświetlenie przefiltrowanych raportów
+            filteredReports.forEach(displayReport);
+        }
     }
 
     function fetchData() {
@@ -73,7 +94,7 @@ document.addEventListener("DOMContentLoaded", function() {
         fetch(`/fetch_reports?cvss=${currentCvssFilter}`)
             .then(response => response.json())
             .then(data => {
-                if (data.done) {
+                if (data.done || fetchingComplete) {
                     fetchingComplete = true; // Zakończ przetwarzanie, jeśli wszystko zostało przetworzone
                     loadingIndicator.style.display = 'none'; // Ukryj wskaźnik ładowania
                     checkNoReportsMessage(); // Sprawdź, czy wyświetlić komunikat o braku raportów
@@ -209,8 +230,4 @@ document.addEventListener("DOMContentLoaded", function() {
             });
         });
     });
-    
-
-    // Uruchom fetchData, aby rozpocząć pobieranie danych
-    fetchData();
 });
