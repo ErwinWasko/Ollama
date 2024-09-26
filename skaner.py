@@ -4,7 +4,6 @@ import requests
 import ollama
 import torch
 
-
 # Funkcja łącząca się z bazą danych
 def connect_to_database():
     try:
@@ -44,6 +43,7 @@ def fetch_security_reports():
             cursor.close()
             connection.close()
 
+# Funkcja pobierająca szczegóły podatności z bazy danych na podstawie CVE
 def fetch_vulnerability_details(cve):
     connection = connect_to_database()
     if connection is None:
@@ -75,6 +75,7 @@ def fetch_vulnerability_details(cve):
             cursor.close()
             connection.close()
 
+# Pobieranie danych z MITRE
 def fetch_mitre_data(cve):
     url = f'https://cveawg.mitre.org/api/cve/{cve}'
     try:
@@ -93,6 +94,7 @@ def fetch_mitre_data(cve):
         print(f"An error occurred: {e}")
         return None
 
+# Przetwarzanie danych z MITRE
 def process_mitre_data(mitre_data):
     if not mitre_data:
         return "No data available", []
@@ -104,6 +106,7 @@ def process_mitre_data(mitre_data):
     
     return description, ref_urls
 
+# Analiza danych przy użyciu Ollama
 def analyze_data_with_ollama(cve, cvss, description, ref_urls):
     try:
         # Sprawdzenie dostępności GPU
@@ -126,13 +129,13 @@ def analyze_data_with_ollama(cve, cvss, description, ref_urls):
 
         Please analyze this information and suggest specific steps to reduce the CVSS score and mitigate this vulnerability based on the content of the referenced pages. Please confirm that the analysis was conducted based on the provided URLs and summarize the conclusions drawn.
         """
-        
-        # Debugowanie promptu
+
+        # Debugowanie promptu - upewnij się, że wyświetla się tylko raz
         print("Prompt for Ollama:", prompt)
-        
+
         # Analiza danych
         response = client.generate(model=model_name, prompt=prompt)
-        
+
         # Sprawdzamy strukturę odpowiedzi
         if isinstance(response, dict):
             if 'response' in response:
@@ -145,71 +148,8 @@ def analyze_data_with_ollama(cve, cvss, description, ref_urls):
         else:
             print("Unexpected response format from Ollama.")
             return "No valid response from Ollama."
-        
+
     except Exception as e:
         print(f"Error analyzing data with Ollama: {e}")
         return "No valid response from Ollama."
 
-def main():
-    # Pobieranie raportów o podatnościach
-    reports = fetch_security_reports()
-    
-    if not isinstance(reports, list) or not reports:
-        print("No security reports found.")
-        return
-    
-    # Iterowanie przez wszystkie raporty
-    for report in reports:
-        cve = report.get('vulnerability')
-        cvss = report.get('vulnerability_score', 'N/A')
-        description = report.get('vulnerability_description', 'No description available')
-        
-        # Pobieranie danych z MITRE CVE API
-        mitre_data = fetch_mitre_data(cve)
-        description, ref_urls = process_mitre_data(mitre_data)
-        
-        # Analiza danych przy użyciu Ollama API
-        ollama_analysis = analyze_data_with_ollama(cve, cvss, description, ref_urls)
-        
-        # Wyświetl wyniki
-        print(f"Report for CVE: {cve}")
-        print("Ollama Analysis:")
-        print(ollama_analysis if ollama_analysis else "No analysis available")
-        print("\n")
-
-        # Funkcja generująca scenariusz ataku za pomocą LLaMA 3
-def generate_attack_scenario(cve, cvss_score, description):
-    try:
-        # Sprawdzenie dostępności GPU
-        torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-        # Przygotowanie klienta Ollama
-        client = ollama.Client()
-        model_name = "llama3"
-
-        # Konstrukcja promptu dla modelu z dodatkowymi danymi (bez ref_urls)
-        prompt = f"""
-        Generate a step-by-step attack scenario for the following vulnerability:
-        CVE: {cve}
-        CVSS Score: {cvss_score}
-        Description: {description}
-
-        Include steps for discovery, exploitation, privilege escalation, and impact.
-        """
-
-        # Generowanie odpowiedzi od LLaMA 3
-        response = client.generate(model=model_name, prompt=prompt)
-
-        if isinstance(response, dict) and 'response' in response:
-            text_response = response['response']
-            steps = text_response.split('\n')
-            return steps
-        else:
-            return ["No valid response from LLaMA."]
-    
-    except Exception as e:
-        print(f"Error generating attack scenario: {e}")
-        return ["Error generating attack scenario."]
-
-if __name__ == "__main__":
-    main()
