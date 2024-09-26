@@ -5,9 +5,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const loadingIndicator = document.getElementById('loading');
     const toggleDarkMode = document.getElementById('toggle-dark-mode');
     const cvssFilter = document.getElementById('cvss');
-    const printPdfButton = document.getElementById('print-pdf');
-    const printWordButton = document.getElementById('print-word');
     let allReports = []; // Przechowuje wszystkie raporty
+    window.allReports = allReports;
     let currentCvssFilter = 'all'; // Aktualny filtr CVSS
     let fetchingComplete = false; // Flaga do zatrzymania pobierania po zakończeniu
     let headerUpdated = false; // Flaga, aby wywołać updateHeader tylko raz
@@ -55,6 +54,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Funkcja do zatrzymania generowania raportów
     function stopGenerating() {
         fetchingComplete = true;  // Ustawienie flagi, aby zatrzymać pobieranie
+        loadingIndicator.style.display = 'none';  // Ukryj wskaźnik ładowania
         console.log('Report generation stopped');
     }
 
@@ -126,108 +126,5 @@ document.addEventListener("DOMContentLoaded", function() {
     cvssFilter.addEventListener('change', function() {
         currentCvssFilter = cvssFilter.value; // Zaktualizuj aktualny filtr CVSS
         applyFilter(currentCvssFilter); // Zastosuj filtr na podstawie wartości CVSS
-    });
-
-    function collectReports() {
-        return allReports.map(report => ({
-            cve: report.cve,
-            cvss: report.cvss,
-            description: report.description,
-            ollama_analysis: report.ollama_analysis
-        }));
-    }
-
-    // Obsługa przycisku Print to PDF
-    printPdfButton.addEventListener("click", function() {
-        const reports = collectReports();  // Zbierz wszystkie raporty
-        if (reports.length === 0) return;
-
-        fetch('/generate_pdf_report', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ reports })  // Przekaż wszystkie raporty
-        })
-        .then(response => response.blob())
-        .then(blob => {
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = "Raporty_CVSS.pdf";
-            link.click();
-        })
-        .catch(error => console.error('Error generating PDF:', error));
-    });
-
-    // Obsługa przycisku Print to Word
-    printWordButton.addEventListener("click", function() {
-        const reports = collectReports();  // Zbierz wszystkie raporty
-        if (reports.length === 0) return;
-
-        fetch('/generate_word_report', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ reports })  // Przekaż wszystkie raporty
-        })
-        .then(response => response.blob())
-        .then(blob => {
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = "Raporty_CVSS.docx";
-            link.click();
-        })
-        .catch(error => console.error('Error generating Word:', error));
-    });
-
-    document.addEventListener("DOMContentLoaded", function() {
-        const sendMessageButton = document.getElementById('send-message');
-        const chatInput = document.getElementById('chat-input');
-        const chatMessages = document.getElementById('chat-messages');
-    
-        // Funkcja do wyświetlania wiadomości
-        function displayMessage(message, className) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('chat-message', className);
-            messageDiv.textContent = message;
-            chatMessages.appendChild(messageDiv);
-            chatMessages.scrollTop = chatMessages.scrollHeight; // Automatyczne przewijanie
-        }
-    
-        // Obsługa kliknięcia przycisku Wyślij
-        sendMessageButton.addEventListener('click', function() {
-            const userMessage = chatInput.value.trim();
-    
-            if (userMessage === '') {
-                alert('Wpisz pytanie!');
-                return;
-            }
-    
-            // Wyświetlenie wiadomości użytkownika w oknie czatu
-            displayMessage(userMessage, 'user-message');
-            chatInput.value = '';
-    
-            // Wysłanie zapytania do backendu
-            fetch('/ask_chatbot', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ question: userMessage }),
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.answer) {
-                    displayMessage(data.answer, 'bot-message');
-                } else {
-                    displayMessage('Nie mogłem znaleźć odpowiedzi.', 'bot-message');
-                }
-            })
-            .catch(error => {
-                console.error("Błąd połączenia z serwerem:", error);
-                displayMessage('Błąd połączenia z serwerem.', 'bot-message');
-            });
-        });
     });
 });
