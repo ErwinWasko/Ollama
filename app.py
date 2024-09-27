@@ -11,6 +11,9 @@ import threading
 
 app = Flask(__name__)
 
+stop_generation_flag = False
+generation_thread = None
+
 client = ollama.Client()
 model_name = "llama3"
 
@@ -51,7 +54,7 @@ def ask_chatbot():
 
 @app.route('/fetch_reports')
 def fetch_reports():
-    global current_reports, all_reports_fetched
+    global current_reports, all_reports_fetched, stop_generation_flag
 
     # Pobranie parametru cvss z żądania
     selected_cvss = request.args.get('cvss', 'all')
@@ -64,7 +67,7 @@ def fetch_reports():
     max_cvss = max([float(report['vulnerability_score']) for report in current_reports]) if current_reports else 0  # Maksymalna podatność
 
     # Sprawdzenie, czy wszystkie raporty zostały przetworzone
-    if all_reports_fetched or not current_reports:
+    if all_reports_fetched or not current_reports or not current_reports:
         return jsonify({
             'done': True,
             'total_reports': total_reports,
@@ -103,6 +106,12 @@ def fetch_reports():
         'total_reports': total_reports,
         'max_cvss': max_cvss
     })
+
+@app.route('/stop_generating', methods=['POST'])
+def stop_generating():
+    global stop_generation_flag
+    stop_generation_flag = True
+    return jsonify({"message": "Report generation stopped."})
 
 # Funkcja do generowania pliku PDF
 @app.route('/generate_pdf_report', methods=['POST'])
