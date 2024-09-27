@@ -7,7 +7,7 @@ import io
 from docx import Document
 import mysql.connector
 from mysql.connector import Error
-import threading
+from reportlab.lib.pagesizes import letter
 
 app = Flask(__name__)
 
@@ -118,24 +118,68 @@ def stop_generating():
 def generate_pdf_report():
     data = request.json
     reports = data.get('reports', [])
-    
+
+    # Tworzenie bufora dla pliku PDF
     buffer = io.BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
+    pdf = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
-    y_position = height - 50
+    y_position = height - 50  # Startowa pozycja Y
+
+    # Funkcja do zawijania długich linii tekstu
+    def draw_wrapped_text(pdf, text, x, y, max_width):
+        lines = []
+        words = text.split(' ')
+        current_line = []
+        current_width = 0
+
+        for word in words:
+            word_width = pdf.stringWidth(word + ' ', 'Helvetica', 12)
+            if current_width + word_width > max_width:
+                lines.append(' '.join(current_line))
+                current_line = [word]
+                current_width = word_width
+            else:
+                current_line.append(word)
+                current_width += word_width
+
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        for line in lines:
+            pdf.drawString(x, y, line)
+            y -= 15  # Przesunięcie w dół dla kolejnej linii
+
+        return y  # Zwróć zaktualizowaną pozycję Y
+
+    # Funkcja do czyszczenia tekstu z nieprawidłowych znaków
+    def clean_text(text):
+        if not text:
+            return ''
+        return ''.join(char for char in text if char.isprintable())  # Usuwa nieczytelne znaki
+
+    # Ustawienia marginesów
+    left_margin = 50
+    right_margin = width - 50
+    max_text_width = right_margin - left_margin
 
     # Rysowanie każdego raportu
     for report in reports:
-        c.drawString(100, y_position, f"CVE: {report['cve']}")
-        c.drawString(100, y_position - 20, f"CVSS Score: {report['cvss']}")
-        c.drawString(100, y_position - 40, f"Description: {report['description']}")
-        c.drawString(100, y_position - 60, f"Ollama Analysis: {report['ollama_analysis']}")
-        y_position -= 100  # Przesunięcie w dół dla kolejnego raportu
-        if y_position < 100:
-            c.showPage()
+        if y_position < 100:  # Jeśli miejsce na stronie się kończy, twórz nową stronę
+            pdf.showPage()
             y_position = height - 50
 
-    c.save()
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(left_margin, y_position, clean_text(f"CVE: {report['cve']}"))
+        y_position -= 20
+        
+        pdf.setFont("Helvetica", 10)
+        y_position = draw_wrapped_text(pdf, clean_text(f"CVSS Score: {report['cvss']}"), left_margin, y_position, max_text_width)
+        y_position = draw_wrapped_text(pdf, clean_text(f"Description: {report['description']}"), left_margin, y_position, max_text_width)
+        y_position = draw_wrapped_text(pdf, clean_text(f"Ollama Analysis: {report['ollama_analysis']}"), left_margin, y_position, max_text_width)
+        
+        y_position -= 40  # Przesunięcie dla kolejnego raportu
+
+    pdf.save()
 
     buffer.seek(0)
     return send_file(buffer, as_attachment=True, download_name="Raporty_CVSS.pdf", mimetype='application/pdf')
