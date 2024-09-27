@@ -77,8 +77,14 @@ def fetch_reports():
     cvss = float(report.get('vulnerability_score', 0))
     description = report.get('vulnerability_description', 'No description available')
 
-    # Przetwarzanie analizy Ollamy
-    ollama_analysis = skaner.analyze_data_with_ollama(cve, cvss, description, [])
+    # Pobieranie danych z MITRE
+    mitre_data = skaner.fetch_mitre_data(cve)
+
+    # Przetwarzanie danych z MITRE, aby uzyskać referencje
+    description, ref_urls = skaner.process_mitre_data(mitre_data)
+
+    # Przetwarzanie analizy Ollamy z referencjami
+    ollama_analysis = skaner.analyze_data_with_ollama(cve, cvss, description, ref_urls)
 
     result = {
         'cve': cve,
